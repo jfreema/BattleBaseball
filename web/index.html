@@ -1,33 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Replaced by `flutter build web --base-href /app/`. -->
+  <!-- Filled in by `flutter build web`. The app is served at the site root. -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Register players, reserve spots, and follow results for Battle Baseball youth player showcases.">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0b1531">
-  <meta name="robots" content="noindex">
+  <title>Battle Baseball Showcase · Youth baseball in Baton Rouge</title>
+  <meta name="description" content="Youth players sign up solo for a Battle Baseball Showcase in Baton Rouge, where every fastball gets clocked on radar and every player earns a card.">
+  <link rel="canonical" href="https://showcase.getbattleplan.app/">
+  <meta name="theme-color" content="#474C2B">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Battle Baseball">
+  <meta property="og:title" content="Battle Baseball Showcase · Youth baseball in Baton Rouge">
+  <meta property="og:description" content="Youth players sign up solo and every fastball gets clocked on radar.">
+  <meta property="og:url" content="https://showcase.getbattleplan.app/">
+  <meta property="og:image" content="https://showcase.getbattleplan.app/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Play the Showcase. Earn your card. A Battle Baseball player card showing a 71 MPH top fastball.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Battle Baseball Showcase · Youth baseball in Baton Rouge">
+  <meta name="twitter:description" content="Youth players sign up solo and every fastball gets clocked on radar.">
+  <meta name="twitter:image" content="https://showcase.getbattleplan.app/og.png">
 
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Battle Baseball">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-
-  <title>Battle Baseball</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="manifest" href="manifest.json">
+
+  <script>
+    // Every address is answered by this one file. Mark the front door so the
+    // shell below can show its headline, and give other pages their own
+    // canonical address.
+    (function () {
+      var root = new URL(document.baseURI).pathname;
+      var path = location.pathname;
+      if (path === root || path === root + 'index.html') {
+        document.documentElement.className = 'home';
+      } else {
+        document.querySelector('link[rel="canonical"]').href = 'https://showcase.getbattleplan.app' + path;
+      }
+    })();
+  </script>
+
   <style>
-    html, body { margin: 0; height: 100%; background: #0b1531; }
-    .boot { position: fixed; inset: 0; display: grid; place-items: center; }
-    .boot div { width: 44px; height: 44px; border-radius: 50%; border: 4px solid #35466d; border-top-color: #f45b5b; animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    /* What a visitor sees while the app loads: the field, the wordmark and,
+       at the front door, the headline and its one line. Sizes and positions
+       mirror lib/screens/home.dart and the shell in lib/app.dart, so the
+       app's first frame lands on top of this without anything moving. The
+       fonts are the app's own bundled files. */
+    @font-face { font-family: "Lilita One"; src: url("assets/assets/fonts/lilita_one/LilitaOne-Regular.ttf") format("truetype"); font-display: block; }
+    @font-face { font-family: "Black Ops One"; src: url("assets/assets/fonts/black_ops_one/BlackOpsOne-Regular.ttf") format("truetype"); font-display: block; }
+    @font-face { font-family: "Nunito"; font-weight: 700; src: url("assets/assets/fonts/nunito/Nunito-Bold.ttf") format("truetype"); font-display: block; }
+
+    html, body { margin: 0; height: 100%; background: #474c2b; }
+    #shell {
+      position: fixed; inset: 0; z-index: 1; overflow: hidden;
+      background: #474c2b; color: #f4ead0;
+      -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+    }
+
+    /* Phones: a 62 px header row, then the page's 16 px sides. */
+    .shell-bar, .shell-home { box-sizing: border-box; max-width: 592px; margin: 0 auto; padding: 0 16px; }
+    .shell-bar { height: 62px; padding-top: 12px; --s: 0.98701; }
+    .shell-mark { display: flex; flex-direction: column; align-items: flex-start; }
+    .shell-mark b { font: 400 calc(25px * var(--s))/0.9 "Lilita One", "Arial Rounded MT Bold", system-ui, sans-serif; letter-spacing: 0.035em; text-shadow: 0 calc(2px * var(--s)) 0 #1a1a18; }
+    .shell-mark i { margin-top: calc(4px * var(--s)); font: 400 calc(12px * var(--s))/1 "Black Ops One", "Lilita One", system-ui, sans-serif; font-style: normal; letter-spacing: 0.115em; color: #f45b5b; }
+
+    .shell-home { display: none; padding-top: 12px; }
+    .home .shell-home { display: block; }
+    /* "Earn your card." is 6.529 em wide; the headline shrinks to fit. */
+    .shell-home h1 {
+      margin: 0; display: flex; flex-direction: column; align-items: flex-start;
+      font: 400 47px/1.03 "Lilita One", "Arial Rounded MT Bold", system-ui, sans-serif;
+      font-size: min(47px, (min(100vw, 592px) - 32px) / 6.529);
+      letter-spacing: 0.005em; white-space: nowrap; text-shadow: 0 0.0851em 0 #1a1a18;
+    }
+    .shell-slab {
+      margin: 0.1em 0 0.2em -0.06em; padding: 0 0.2em 0.06em;
+      background: #f45b5b; color: #1a1a18; text-shadow: none;
+      border: 0.0638em solid #1a1a18; border-radius: 0.24em; box-shadow: 0 0.1064em 0 #1a1a18;
+      transform: rotate(-2.5deg);
+    }
+    .shell-home p { margin: 14px 0 0; max-width: 357px; font: 700 17px/1.4 "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif; color: rgba(244, 234, 208, 0.82); }
+
+    /* Desktop: an 84 px top bar, 40 px sides, and the copy in the column
+       left of the sample card. */
+    @media (min-width: 960px) {
+      .shell-bar, .shell-home { max-width: 1200px; padding: 0 40px; }
+      .shell-bar { height: 84px; padding-top: 18.8px; --s: 1.20519; }
+      .shell-home {
+        --content: min(1120px, 100vw - 80px);
+        --card: clamp(340px, var(--content) * 0.375, 420px);
+        --copy: calc(var(--content) - var(--card) - 84px);
+        padding-top: calc(30px + var(--card) * 0.18);
+      }
+      .shell-home h1 { font-size: min(88px, var(--copy) / 6.529); line-height: 1; text-shadow: 0 0.0682em 0 #1a1a18; }
+      .shell-slab { border-width: 0.0455em; box-shadow: 0 0.0795em 0 #1a1a18; }
+      .shell-home p { margin-top: 26px; max-width: min(462px, var(--copy)); font-size: 21px; }
+    }
   </style>
 </head>
 <body>
-  <div class="boot" aria-label="Loading"><div></div></div>
+  <div id="shell">
+    <div class="shell-bar"><div class="shell-mark"><b>BATTLE</b><i>BASEBALL</i></div></div>
+    <div class="shell-home">
+      <h1><span>Play the</span> <span class="shell-slab">Showcase.</span> <span>Earn your card.</span></h1>
+      <p>Youth players sign up solo and every fastball gets clocked on radar.</p>
+    </div>
+  </div>
+  <script>
+    // The shell leaves when the app has painted its first frame.
+    (function () {
+      var shell = document.getElementById('shell');
+      function clear() {
+        if (shell) shell.remove();
+        shell = null;
+      }
+      window.addEventListener('flutter-first-frame', clear, { once: true });
+      // Should an engine ever stop sending that event, don't cover the app.
+      new MutationObserver(function (changes, watcher) {
+        if (document.querySelector('flutter-view, flt-glass-pane')) {
+          watcher.disconnect();
+          setTimeout(clear, 5000);
+        }
+      }).observe(document.body, { childList: true });
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

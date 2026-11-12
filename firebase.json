@@ -39,22 +39,23 @@
     "cleanUrls": true,
     "trailingSlash": false,
     "redirects": [
-      { "source": "/events", "destination": "/app/events", "type": 302 },
-      { "source": "/events/:id", "destination": "/app/events/:id", "type": 302 },
-      { "source": "/register/:id", "destination": "/app/events/:id/reserve", "type": 302 },
-      { "source": "/leaderboards", "destination": "/app/leaderboards", "type": 302 },
+      { "source": "/app", "destination": "/", "type": 302 },
+      { "source": "/app/:path*", "destination": "/:path", "type": 302 },
+      { "source": "/register/:id", "destination": "/events/:id/reserve", "type": 302 },
+      { "source": "/how-it-works", "destination": "/", "type": 302 },
+      { "source": "/shop", "destination": "/", "type": 302 },
       { "source": "/battleplan", "destination": "https://getbattleplan.app", "type": 302 }
     ],
     "rewrites": [
-      { "source": "/app/**", "destination": "/app/index.html" }
+      { "source": "**", "destination": "/index.html" }
     ],
     "headers": [
       {
-        "source": "**/*.@(html|js|json)",
+        "source": "**/*.@(html|js|mjs|json)",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       },
       {
-        "source": "/app{,/**}",
+        "source": "**/!(*.*)",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       },
       {

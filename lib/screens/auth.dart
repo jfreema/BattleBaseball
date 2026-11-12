@@ -2,9 +2,9 @@ import 'package:battle_baseball/design/bb.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// The first stop for an account with no profile yet (a new Google sign-in):
 /// confirm 18+ and the terms, or back out and delete the account.
@@ -29,8 +29,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    if (!_adult || _name.text.trim().isEmpty) {
-      toast(context, 'Add your name and confirm you are 18 or older.');
+    if (_name.text.trim().isEmpty) {
+      toast(context, 'Add your name.');
+      return;
+    }
+    if (!_adult) {
+      toast(context, 'Check the box to continue.');
       return;
     }
     setState(() => _busy = true);
@@ -51,7 +55,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       }
       await batch.commit();
     } catch (e) {
-      if (mounted) toast(context, "Couldn't save: $e");
+      debugPrint('Saving the profile failed: $e');
+      if (mounted) toast(context, "Couldn't save. Try again.");
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -66,49 +71,23 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: ListView(
-              padding: const EdgeInsets.all(20),
-              shrinkWrap: true,
-              children: [
-                const Center(child: Wordmark(width: 200)),
-                const SizedBox(height: 24),
-                const Eyebrow('Welcome'),
-                const Headline('One more thing', size: 32),
-                const SizedBox(height: 8),
-                const Text(
-                  'Battle Baseball accounts are for parents, guardians, and volunteers. '
-                  'Players never need their own.',
-                  style: TextStyle(color: BB.muted, fontSize: 16),
-                ),
-                const SizedBox(height: 18),
-                TextField(
-                  controller: _name,
-                  decoration: const InputDecoration(labelText: 'Your name'),
-                  textCapitalization: TextCapitalization.words,
-                ),
-                const SizedBox(height: 8),
-                CheckboxListTile(
-                  value: _adult,
-                  onChanged: (v) => setState(() => _adult = v ?? false),
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: const Text(
-                    "I'm 18 or older and agree to the Terms and Privacy Policy.",
-                    style: TextStyle(fontSize: 15),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                CandyButton(label: 'Continue', expand: true, busy: _busy, onPressed: _save),
-                const SizedBox(height: 8),
-                TextButton(onPressed: _cancel, child: const Text("Cancel, I'm not 18")),
-              ],
-            ),
+  Widget build(BuildContext context) => _AuthFrame(
+        children: [
+          const PageTitle('One more thing', padding: _titlePadding),
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: 'Your name'),
+            textCapitalization: TextCapitalization.words,
+            autofillHints: const [AutofillHints.name],
+            onSubmitted: (_) => _save(),
           ),
-        ),
+          const SizedBox(height: 6),
+          _Consent(value: _adult, onChanged: (v) => setState(() => _adult = v)),
+          const SizedBox(height: 16),
+          BBButton.primary('Continue', expand: true, busy: _busy, onPressed: _save),
+          const SizedBox(height: 10),
+          TextLink('Cancel', onTap: _cancel),
+        ],
       );
 }
 
@@ -141,18 +120,19 @@ class _SignInScreenState extends State<SignInScreen> {
 
   String _message(FirebaseAuthException e) => switch (e.code) {
         'invalid-credential' || 'wrong-password' || 'user-not-found' =>
-          "That email and password don't match an account.",
-        'email-already-in-use' => 'There is already an account with that email. Try signing in.',
-        'weak-password' => 'Pick a password with at least 8 characters.',
-        'invalid-email' => "That email address doesn't look right.",
-        'too-many-requests' => 'Too many tries. Wait a minute and try again.',
+          "That email and password don't match.",
+        'email-already-in-use' => 'That email already has an account.',
+        'weak-password' => 'Use at least 8 characters.',
+        'invalid-email' => "That email doesn't look right.",
+        'too-many-requests' => 'Too many tries. Wait a minute.',
         _ => e.message ?? 'Something went wrong. Try again.',
       };
 
   Future<void> _submit() async {
+    if (_busy) return;
     if (!_form.currentState!.validate()) return;
     if (_signUp && !_adult) {
-      setState(() => _error = 'Accounts are for adults 18 and over.');
+      setState(() => _error = 'Check the box to continue.');
       return;
     }
     setState(() {
@@ -182,9 +162,9 @@ class _SignInScreenState extends State<SignInScreen> {
         await auth.signInWithEmailAndPassword(email: email, password: _password.text);
       }
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = _message(e));
+      if (mounted) setState(() => _error = _message(e));
     } catch (e) {
-      setState(() => _error = 'Something went wrong. Try again.');
+      if (mounted) setState(() => _error = 'Something went wrong. Try again.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -193,6 +173,7 @@ class _SignInScreenState extends State<SignInScreen> {
   /// Continue with Google. A first-time Google account confirms it's an
   /// adult and accepts the terms before its profile is saved.
   Future<void> _google() async {
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -207,10 +188,10 @@ class _SignInScreenState extends State<SignInScreen> {
       debugPrint('Signed in with Google: ${cred.user?.uid}');
     } on FirebaseAuthException catch (e) {
       if (e.code != 'popup-closed-by-user' && e.code != 'cancelled-popup-request') {
-        setState(() => _error = _message(e));
+        if (mounted) setState(() => _error = _message(e));
       }
     } catch (e) {
-      setState(() => _error = 'Google sign-in did not finish. Try again.');
+      if (mounted) setState(() => _error = "Google sign-in didn't finish. Try again.");
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -219,158 +200,224 @@ class _SignInScreenState extends State<SignInScreen> {
   Future<void> _reset() async {
     final email = _email.text.trim();
     if (email.isEmpty) {
-      setState(() => _error = 'Type your email above, then tap Forgot password.');
+      setState(() => _error = 'Enter your email first.');
       return;
     }
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (mounted) toast(context, 'Check $email for a link to reset your password.');
+      if (mounted) toast(context, 'Reset link sent to $email.');
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = _message(e));
+      if (mounted) setState(() => _error = _message(e));
     }
+  }
+
+  void _switch() => setState(() {
+        _signUp = !_signUp;
+        _error = null;
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = _signUp ? 'Create an account' : 'Sign in';
+    return _AuthFrame(
+      onClose: () => context.canPop() ? context.pop() : context.go('/'),
+      children: [
+        PageTitle(title, padding: _titlePadding),
+        Form(
+          key: _form,
+          child: AutofillGroup(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_signUp) ...[
+                  TextFormField(
+                    controller: _name,
+                    decoration: const InputDecoration(labelText: 'Your name'),
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.name],
+                    validator: (v) => (v ?? '').trim().isEmpty ? 'Enter your name' : null,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextFormField(
+                  controller: _email,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
+                  validator: (v) => (v ?? '').contains('@') ? null : 'Enter your email',
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _password,
+                  decoration: const InputDecoration(labelText: 'Password'),
+                  obscureText: true,
+                  autofillHints: [_signUp ? AutofillHints.newPassword : AutofillHints.password],
+                  onFieldSubmitted: (_) => _submit(),
+                  validator: (v) => (v ?? '').length < (_signUp ? 8 : 1)
+                      ? (_signUp ? 'At least 8 characters' : 'Enter your password')
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_signUp) ...[
+          const SizedBox(height: 6),
+          _Consent(value: _adult, onChanged: (v) => setState(() => _adult = v)),
+        ],
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(_error!, style: BB.labelStyle(15, color: BB.coral, height: 1.3)),
+            ),
+          ),
+        const SizedBox(height: 16),
+        BBButton.primary(title, expand: true, busy: _busy, onPressed: _submit),
+        const SizedBox(height: 12),
+        BBButton.paper('Continue with Google', expand: true, onPressed: _google),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 22,
+          children: [
+            TextLink(_signUp ? 'Sign in' : 'Create an account', onTap: _switch),
+            if (!_signUp) TextLink('Forgot password', onTap: _reset),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+const _titlePadding = EdgeInsets.only(top: 6, bottom: 18);
+
+/// The frame the account screens share: the wordmark on top, an optional
+/// close button, and one narrow column. These screens sit outside the app's
+/// bars.
+class _AuthFrame extends StatelessWidget {
+  const _AuthFrame({required this.children, this.onClose});
+
+  final List<Widget> children;
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = BB.isWide(context);
+    return Scaffold(
+      body: PageFrame(
+        maxWidth: 420,
+        children: [
+          if (wide) const SizedBox(height: 24),
+          SizedBox(
+            height: wide ? 84 : 62,
+            child: Row(
+              children: [
+                Wordmark(height: wide ? 46.4 : 38),
+                const Spacer(),
+                if (onClose != null)
+                  // Nudged so the X itself sits on the column's edge.
+                  Transform.translate(
+                    offset: const Offset(11, 0),
+                    child: Pressable(
+                      onTap: onClose,
+                      label: 'Close',
+                      builder: (context, down, focused) => Opacity(
+                        opacity: down ? 0.7 : 1,
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: focused ? Border.all(color: BB.cream, width: 2) : null,
+                          ),
+                          child: const Center(child: BBIcon(BBGlyph.close, size: 22, color: BB.cream)),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+/// The one consent line: a checkbox, and the Terms and Privacy Policy as
+/// links inside the sentence.
+class _Consent extends StatefulWidget {
+  const _Consent({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  State<_Consent> createState() => _ConsentState();
+}
+
+class _ConsentState extends State<_Consent> {
+  late final _terms = TapGestureRecognizer()..onTap = () => openSitePage('/terms');
+  late final _privacy = TapGestureRecognizer()..onTap = () => openSitePage('/privacy');
+
+  @override
+  void dispose() {
+    _terms.dispose();
+    _privacy.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          tooltip: 'Close',
-          onPressed: () => context.canPop() ? context.pop() : context.go('/'),
-        ),
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-            shrinkWrap: true,
-            children: [
-              const Center(child: Wordmark(width: 200)),
-              const SizedBox(height: 24),
-              Eyebrow(_signUp ? 'Parents and volunteers' : 'Welcome back'),
-              Headline(_signUp ? 'Create your account' : 'Sign in', size: 32),
-              const SizedBox(height: 8),
-              Text(
-                _signUp
-                    ? 'One account covers all your players. Kids never need their own.'
-                    : 'Register players, reserve spots, and follow results.',
-                style: const TextStyle(color: BB.muted, fontSize: 16),
-              ),
-              const SizedBox(height: 20),
-              CandyButton(
-                label: 'Continue with Google',
-                icon: Icons.account_circle,
-                face: Colors.white,
-                fg: const Color(0xFF1F1F1F),
-                edge: BB.ink,
-                expand: true,
-                onPressed: _busy ? null : _google,
-              ),
-              const SizedBox(height: 18),
-              const Row(children: [
-                Expanded(child: Divider()),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('or use email', style: TextStyle(color: BB.muted)),
+    final on = widget.value;
+    const link = TextStyle(
+      color: BB.cream,
+      decoration: TextDecoration.underline,
+      decorationColor: BB.coral,
+      decorationThickness: 2,
+    );
+    return Semantics(
+      checked: on,
+      child: Pressable(
+        onTap: () => widget.onChanged(!on),
+        builder: (context, down, focused) => Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: on ? BB.coral : BB.fieldRaised,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: focused ? BB.cream : BB.ink, width: 2),
+                  boxShadow: BB.lip(2),
                 ),
-                Expanded(child: Divider()),
-              ]),
-              const SizedBox(height: 18),
-              Form(
-                key: _form,
-                child: AutofillGroup(
-                  child: Column(
-                    children: [
-                      if (_signUp) ...[
-                        TextFormField(
-                          controller: _name,
-                          decoration: const InputDecoration(labelText: 'Your name'),
-                          textCapitalization: TextCapitalization.words,
-                          autofillHints: const [AutofillHints.name],
-                          validator: (v) =>
-                              (v ?? '').trim().isEmpty ? 'Enter your name' : null,
-                        ),
-                        const SizedBox(height: 14),
-                      ],
-                      TextFormField(
-                        controller: _email,
-                        decoration: const InputDecoration(labelText: 'Email'),
-                        keyboardType: TextInputType.emailAddress,
-                        autofillHints: const [AutofillHints.email],
-                        validator: (v) =>
-                            (v ?? '').contains('@') ? null : 'Enter your email',
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: _password,
-                        decoration: const InputDecoration(labelText: 'Password'),
-                        obscureText: true,
-                        autofillHints: [
-                          _signUp ? AutofillHints.newPassword : AutofillHints.password
-                        ],
-                        onFieldSubmitted: (_) => _submit(),
-                        validator: (v) => (v ?? '').length < (_signUp ? 8 : 1)
-                            ? (_signUp ? 'At least 8 characters' : 'Enter your password')
-                            : null,
-                      ),
-                    ],
-                  ),
+                child: on ? const Center(child: BBIcon(BBGlyph.check, size: 16, color: BB.ink)) : null,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                child: Text.rich(
+                  TextSpan(children: [
+                    const TextSpan(text: "I'm 18 or older and agree to the "),
+                    TextSpan(text: 'Terms', style: link, recognizer: _terms),
+                    const TextSpan(text: ' and '),
+                    TextSpan(text: 'Privacy Policy', style: link, recognizer: _privacy),
+                    const TextSpan(text: '.'),
+                  ]),
+                  style: BB.bodyStyle(15.5),
                 ),
               ),
-              if (_signUp) ...[
-                const SizedBox(height: 10),
-                CheckboxListTile(
-                  value: _adult,
-                  onChanged: (v) => setState(() => _adult = v ?? false),
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: const Text(
-                    "I'm 18 or older and agree to the Terms and Privacy Policy.",
-                    style: TextStyle(fontSize: 15),
-                  ),
-                ),
-                Wrap(
-                  spacing: 16,
-                  children: [
-                    TextButton(
-                      onPressed: () => launchUrl(Uri.parse('https://showcase.getbattleplan.app/terms')),
-                      child: const Text('Terms'),
-                    ),
-                    TextButton(
-                      onPressed: () => launchUrl(Uri.parse('https://showcase.getbattleplan.app/privacy')),
-                      child: const Text('Privacy Policy'),
-                    ),
-                  ],
-                ),
-              ],
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text(_error!, style: const TextStyle(color: BB.accent, fontSize: 15)),
-                ),
-              const SizedBox(height: 18),
-              CandyButton(
-                label: _signUp ? 'Create account' : 'Sign in',
-                onPressed: _submit,
-                busy: _busy,
-                expand: true,
-              ),
-              const SizedBox(height: 10),
-              if (!_signUp)
-                TextButton(onPressed: _reset, child: const Text('Forgot password?')),
-              TextButton(
-                onPressed: () => setState(() {
-                  _signUp = !_signUp;
-                  _error = null;
-                }),
-                child: Text(_signUp
-                    ? 'Already have an account? Sign in'
-                    : 'New to Battle Baseball? Create an account'),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

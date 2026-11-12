@@ -9,8 +9,15 @@ const waiverVersion = '2026-11-v1';
 const holdHours = 24;
 
 class Repo {
-  Repo._();
-  static final Repo instance = Repo._();
+  Repo();
+
+  /// The one repo the app reads and writes through. main() swaps in the
+  /// sample-data repo when the app is opened with ?demo=1.
+  static Repo instance = Repo();
+
+  /// True while the app is showing sample data instead of Firestore.
+  static bool get isDemo => instance.demo;
+  bool get demo => false;
 
   FirebaseFirestore get db => FirebaseFirestore.instance;
   Session get session => Session.instance;
@@ -22,6 +29,8 @@ class Repo {
   CollectionReference<Json> get measurements => db.collection('measurements');
   CollectionReference<Json> get awards => db.collection('awards');
   CollectionReference<Json> get staff => db.collection('staffAssignments');
+  CollectionReference<Json> get publicProfiles => db.collection('publicProfiles');
+  CollectionReference<Json> get statLines => db.collection('statLines');
 
   // ---------- Events ----------
 
@@ -87,8 +96,13 @@ class Repo {
   Stream<Json?> playerPrivate(String id) =>
       db.doc('playerPrivate/$id').snapshots().map((d) => d.data());
 
+  /// Saves a player. The public profile document is written in the same
+  /// batch when the guardian has it switched on and removed when it's off,
+  /// and the choice is then copied onto the player's registrations and
+  /// published results so it takes effect everywhere at once.
   Future<String> savePlayer(String? id, Json data, Json private) async {
     final ref = id == null ? players.doc() : players.doc(id);
+    final public = data['publicProfile'] == true;
     final batch = db.batch();
     if (id == null) {
       batch.set(ref, {...data, 'createdAt': FieldValue.serverTimestamp()});
@@ -99,9 +113,90 @@ class Repo {
       ...private,
       'guardianUids': data['guardianUids'],
     });
+    if (public) {
+      batch.set(publicProfiles.doc(ref.id), _publicJson(data));
+    } else if (id != null) {
+      batch.delete(publicProfiles.doc(ref.id));
+    }
     await batch.commit();
+    if (id != null) {
+      await _syncVisibility(ref.id, data['publicName'] as String? ?? '', public);
+    }
     return ref.id;
   }
+
+  Json _publicJson(Json player) => {
+        'name': player['publicName'],
+        'gradYear': player['gradYear'],
+        'positions': player['positions'],
+        'bats': player['bats'],
+        'throws': player['throws'],
+        'state': player['state'],
+        if (player['jersey'] != null) 'jersey': player['jersey'],
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+  /// Makes sure a player whose profile is switched on has its public
+  /// document (players saved before public profiles had their own).
+  Future<void> ensurePublicProfile(Player p) async {
+    if (!p.publicProfile) return;
+    try {
+      final d = await publicProfiles.doc(p.id).get();
+      if (!d.exists) await publicProfiles.doc(p.id).set(_publicJson(p.toJson()));
+    } catch (_) {
+      // Not this guardian's to write, or offline: nothing to fix here.
+    }
+  }
+
+  /// Copies a guardian's public-or-private choice onto the player's
+  /// registrations and published results. Results that aren't published yet
+  /// pick it up from the registration when the event is published.
+  Future<void> _syncVisibility(String playerId, String publicName, bool public) async {
+    final uid = session.user?.uid;
+    if (uid == null) return;
+    try {
+      final shown = public ? publicName : '';
+      final regs = await registrations
+          .where('guardianUid', isEqualTo: uid)
+          .where('playerId', isEqualTo: playerId)
+          .get();
+      final results = await Future.wait([
+        for (final c in [measurements, awards, statLines])
+          c.where('playerId', isEqualTo: playerId).where('published', isEqualTo: true).get(),
+      ]);
+      final writes = <(DocumentReference<Json>, Json)>[
+        for (final d in regs.docs)
+          if (d.data()['publicName'] != publicName || d.data()['playerPublic'] != public)
+            (d.reference, {'publicName': publicName, 'playerPublic': public}),
+        for (final q in results)
+          for (final d in q.docs)
+            if (d.data()['publicName'] != shown || d.data()['playerPublic'] != public)
+              (d.reference, {'publicName': shown, 'playerPublic': public}),
+      ];
+      for (var i = 0; i < writes.length; i += 400) {
+        final batch = db.batch();
+        for (final (ref, data) in writes.skip(i).take(400)) {
+          batch.update(ref, data);
+        }
+        await batch.commit();
+      }
+    } catch (_) {
+      // The player itself saved; a later save or the next publish catches up.
+    }
+  }
+
+  // ---------- Public profiles ----------
+
+  /// A player's public profile, or null when it's private or doesn't exist.
+  Stream<PublicProfile?> publicProfile(String id) => publicProfiles
+      .doc(id)
+      .snapshots()
+      .map((d) => d.exists ? PublicProfile.fromDoc(d) : null);
+
+  /// Every public profile, by name.
+  Stream<List<PublicProfile>> allPublicProfiles() => publicProfiles.limit(500).snapshots().map(
+      (s) => s.docs.map(PublicProfile.fromDoc).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())));
 
   // ---------- Registrations ----------
 
@@ -267,6 +362,45 @@ class Repo {
 
   Future<void> deleteAward(String id) => awards.doc(id).delete();
 
+  /// Saves a player's game stats for one showcase (one line per player).
+  Future<void> saveStatLine(Registration r, BBEvent e, StatLine line) =>
+      statLines.doc(regId(e.id, r.playerId)).set({
+        'eventId': e.id,
+        'eventName': e.name,
+        'playerId': r.playerId,
+        'publicName': r.playerPublic ? r.publicName : '',
+        'playerPublic': r.playerPublic,
+        'divisionName': r.divisionName,
+        'gradYear': r.gradYear,
+        ...line.numbers(),
+        'recordedBy': session.user!.uid,
+        'recordedAt': FieldValue.serverTimestamp(),
+        'published': e.resultsPublished,
+      });
+
+  Future<void> deleteStatLine(String id) => statLines.doc(id).delete();
+
+  /// Every stat line at an event, drafts included (staff).
+  Stream<List<StatLine>> eventStatLines(String eventId) => statLines
+      .where('eventId', isEqualTo: eventId)
+      .snapshots()
+      .map((s) => s.docs.map(StatLine.fromDoc).toList());
+
+  /// Published stat lines for one event (anyone).
+  Stream<List<StatLine>> publishedStatLines(String eventId) => statLines
+      .where('eventId', isEqualTo: eventId)
+      .where('published', isEqualTo: true)
+      .snapshots()
+      .map((s) => s.docs.map(StatLine.fromDoc).toList());
+
+  /// A player's published stat lines, oldest first.
+  Stream<List<StatLine>> playerStatLines(String playerId) => statLines
+      .where('playerId', isEqualTo: playerId)
+      .where('published', isEqualTo: true)
+      .snapshots()
+      .map((s) => s.docs.map(StatLine.fromDoc).toList()
+        ..sort((a, b) => (a.recordedAt ?? DateTime(2000)).compareTo(b.recordedAt ?? DateTime(2000))));
+
   Stream<List<Measurement>> eventMeasurements(String eventId) => measurements
       .where('eventId', isEqualTo: eventId)
       .snapshots()
@@ -325,20 +459,54 @@ class Repo {
       .snapshots()
       .map((s) => s.docs.map(Award.fromDoc).toList());
 
-  /// Publishing is what makes an event's results public.
+  /// Publishing is what makes an event's results public. Each result takes
+  /// the public-or-private choice from the player's registration as it
+  /// stands now, so a family that changed its mind since sign-up is honored.
   Future<void> publishResults(String eventId) async {
+    final regs = await registrations.where('eventId', isEqualTo: eventId).get();
+    final byPlayer = {
+      for (final r in regs.docs.map(Registration.fromDoc)) r.playerId: r,
+    };
     final ms = await measurements.where('eventId', isEqualTo: eventId).get();
     final as = await awards.where('eventId', isEqualTo: eventId).get();
-    final docs = [...ms.docs, ...as.docs];
+    final ss = await statLines.where('eventId', isEqualTo: eventId).get();
+    final docs = [...ms.docs, ...as.docs, ...ss.docs];
     for (var i = 0; i < docs.length; i += 400) {
       final batch = db.batch();
       for (final d in docs.skip(i).take(400)) {
-        batch.update(d.reference, {'published': true});
+        final r = byPlayer[d.data()['playerId']];
+        batch.update(d.reference, {
+          'published': true,
+          if (r != null) 'publicName': r.playerPublic ? r.publicName : '',
+          if (r != null) 'playerPublic': r.playerPublic,
+        });
       }
       await batch.commit();
     }
     await events.doc(eventId).update({'resultsPublished': true, 'status': 'final'});
   }
+
+  // ---------- Hosting a showcase ----------
+
+  /// A team asking to host a showcase. Anyone can send one; admins read them.
+  Future<void> sendHostInquiry({
+    required String team,
+    required String contact,
+    required String email,
+    String city = '',
+    String phone = '',
+    String message = '',
+  }) =>
+      db.collection('hostInquiries').add({
+        'team': team,
+        'city': city,
+        'contact': contact,
+        'email': email,
+        'phone': phone,
+        'message': message,
+        'status': 'new',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
   // ---------- Payment settings and people ----------
 

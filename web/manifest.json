@@ -1,35 +1,17 @@
 {
-    "name":  "Battle Baseball",
-    "short_name":  "Battle Baseball",
-    "start_url":  ".",
-    "display":  "standalone",
-    "background_color":  "#0b1531",
-    "theme_color":  "#0b1531",
-    "description":  "Battle Baseball youth player showcases.",
-    "orientation":  "portrait-primary",
-    "prefer_related_applications":  false,
-    "icons":  [
-                  {
-                      "src":  "icons/Icon-192.png",
-                      "sizes":  "192x192",
-                      "type":  "image/png"
-                  },
-                  {
-                      "src":  "icons/Icon-512.png",
-                      "sizes":  "512x512",
-                      "type":  "image/png"
-                  },
-                  {
-                      "src":  "icons/Icon-maskable-192.png",
-                      "sizes":  "192x192",
-                      "type":  "image/png",
-                      "purpose":  "maskable"
-                  },
-                  {
-                      "src":  "icons/Icon-maskable-512.png",
-                      "sizes":  "512x512",
-                      "type":  "image/png",
-                      "purpose":  "maskable"
-                  }
-              ]
+  "name": "Battle Baseball",
+  "short_name": "Battle Baseball",
+  "description": "Youth baseball showcases in Baton Rouge.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#474C2B",
+  "theme_color": "#474C2B",
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icons/Icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/Icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/Icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/Icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
 }

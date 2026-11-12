@@ -1,5 +1,8 @@
+// Formatters, wording and the few widgets more than one screen needs.
 import 'package:battle_baseball/data/models.dart';
+import 'package:battle_baseball/data/repo.dart';
 import 'package:battle_baseball/design/bb.dart';
+import 'package:battle_baseball/design/card.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
@@ -24,15 +27,6 @@ String holdUntil(DateTime? end) {
       : 'until ${DateFormat('EEE h:mm a').format(end)}';
 }
 
-Color statusColor(String status) => switch (status) {
-      'open' => BB.mint,
-      'live' => BB.coral,
-      'final' => BB.blue,
-      'closed' => BB.lemon,
-      'rainedOut' => BB.grape,
-      _ => BB.rim,
-    };
-
 String statusLabel(String status) => switch (status) {
       'open' => 'Registration open',
       'live' => 'Happening now',
@@ -43,127 +37,227 @@ String statusLabel(String status) => switch (status) {
       _ => status,
     };
 
+/// What a family sees for a registration, and the pill color to show it on.
 (String, Color) registrationLabel(Registration r) {
-  if (r.holdEnded) return ('Checking payment', BB.lemon);
-  return switch (r.status) {
-    'held' => ('Spot held', BB.lemon),
-    'offered' => ('Spot offered', BB.lemon),
-    'paid' => ('All set', BB.mint),
-    'checkedIn' => ('Checked in', BB.mint),
-    'waitlisted' => ('Waitlist', BB.grape),
-    'released' => ('Spot released', BB.rim),
-    'cancelled' => ('Cancelled', BB.rim),
-    'refundDue' => ('Refund on the way', BB.blue),
-    'refunded' => ('Refunded', BB.blue),
-    'credited' => ('Credit saved', BB.blue),
-    _ => (r.status, BB.rim),
+  if (r.holdEnded) return ('Still matching', BB.cream);
+  final label = switch (r.status) {
+    'held' || 'offered' => 'Confirming payment',
+    'paid' => 'All set',
+    'checkedIn' => 'Checked in',
+    'waitlisted' => 'Waitlist',
+    'released' => 'Released',
+    'cancelled' => 'Cancelled',
+    'refundDue' => 'Refund on the way',
+    'refunded' => 'Refunded',
+    'credited' => 'Credit saved',
+    _ => r.status,
   };
+  return (label, BB.cream);
 }
 
-/// An event in a list: name, date, place, and status.
-class EventCard extends StatelessWidget {
-  const EventCard({super.key, required this.event, this.edge, this.onTap});
-  final BBEvent event;
-  final Color? edge;
-  final VoidCallback? onTap;
+/// What a small award seal carries: a star for MVP (drawn by AwardSeal),
+/// the award's initials otherwise.
+String awardMark(String type) => sealMark(type);
+
+/// The small caps line under a player's name: "CLASS OF 2031 · RHP".
+String playerLine(PublicProfile p) => [
+      if (p.gradYear != null) 'CLASS OF ${p.gradYear}',
+      if (p.positionCodes.isNotEmpty) p.positionCodes.first,
+    ].join(' · ');
+
+/// A tick label for the fastball chart: "SPR 11U" from "Spring Showcase"
+/// and "11U".
+String tickLabel(String eventName, [String divisionName = '']) {
+  String firstWord(String s) => s.trim().split(RegExp(r'\s+')).first.toUpperCase();
+  final word = firstWord(eventName);
+  final season = switch (word) {
+    'SPRING' => 'SPR',
+    'SUMMER' => 'SUM',
+    'WINTER' => 'WIN',
+    'AUTUMN' => 'FALL',
+    _ => word.length > 5 ? word.substring(0, 5) : word,
+  };
+  return [season, firstWord(divisionName)].where((s) => s.isNotEmpty).join(' ');
+}
+
+/// A family's registration as a paper row: the player, the showcase and age
+/// group, and a status pill. When a hold has ended it offers "I already
+/// paid". Tapping the row opens the showcase.
+class RegistrationRow extends StatelessWidget {
+  const RegistrationRow(this.r, {super.key, this.showEvent = true});
+
+  final Registration r;
+
+  /// Off on the showcase's own screen, where its name would only repeat.
+  final bool showEvent;
+
+  Future<void> _alreadyPaid(BuildContext context) async {
+    try {
+      await Repo.instance.flagAlreadyPaid(r);
+    } catch (_) {
+      // Sample data, or offline: the thanks still stands and staff still check.
+    }
+    if (context.mounted) toast(context, "Thanks. We'll look for it.");
+  }
 
   @override
   Widget build(BuildContext context) {
-    final e = event;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GumCard(
-        edge: edge ?? statusColor(e.status),
-        onTap: onTap ?? () => context.go('/events/${e.id}'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Eyebrow([if (e.ageGroups.isNotEmpty) e.ageGroups, 'Player showcase'].join(' · ')),
-            Text(e.name, style: BB.title(22)),
-            const SizedBox(height: 6),
-            Text('${fmtDate(e.start)} · ${e.venue.isNotEmpty ? '${e.venue}, ' : ''}${e.city}',
-                style: const TextStyle(color: BB.cardMuted, fontSize: 15)),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                StatusChip(statusLabel(e.status), color: statusColor(e.status)),
-                StatusChip(fmtPrice(e.price), color: BB.page, fg: BB.text),
-                if (e.skillsContest) const StatusChip('Skills contest', color: BB.grape),
-              ],
+    final (label, color) = registrationLabel(r);
+    final sub = [if (showEvent && r.eventName.isNotEmpty) r.eventName, r.divisionName]
+        .where((s) => s.isNotEmpty)
+        .join(' · ');
+    final askPaid = r.holdEnded && !r.alreadyPaid;
+    return Paper(
+      onTap: () => context.go('/events/${r.eventId}'),
+      sink: !askPaid,
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      r.playerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: BB.labelStyle(19, color: BB.ink, height: 1.1),
+                    ),
+                    if (sub.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Text(sub, style: BB.bodyStyle(14, color: BB.ink2, height: 1.25)),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Pill(label, color: color),
+            ],
+          ),
+          if (askPaid)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: BBButton.paper('I already paid', small: true, onPressed: () => _alreadyPaid(context)),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
 }
 
-/// A big Lilita readout: "71 MPH".
-class Readout extends StatelessWidget {
-  const Readout({super.key, required this.value, required this.unit, this.color = BB.lemon, this.size = 44});
-  final String value;
-  final String unit;
-  final Color color;
-  final double size;
+/// How a tab's first screen starts on phones: the wordmark, 62 tall, with
+/// room for one thing at the right. On desktop the top bar carries the
+/// wordmark, so this is only a little air.
+class TabHeader extends StatelessWidget {
+  const TabHeader({super.key, this.trailing});
+
+  final Widget? trailing;
+
   @override
-  Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
+  Widget build(BuildContext context) {
+    if (BB.isWide(context)) return const SizedBox(height: 12);
+    // Sample data says so in place of whatever else would sit here.
+    final right = Repo.isDemo ? const Stamp('SAMPLE DATA') : trailing;
+    return SizedBox(
+      height: 62,
+      child: Row(
         children: [
-          Text(value, style: BB.title(size, color: color)),
-          const SizedBox(width: 6),
-          Text(unit, style: BB.labelStyle(size * 0.38, color: BB.cardMuted)),
+          const Wordmark(),
+          const SizedBox(width: 12),
+          Expanded(child: Align(alignment: Alignment.centerRight, child: right)),
+        ],
+      ),
+    );
+  }
+}
+
+/// The top of a pushed screen: a back chevron with the parent's name, and
+/// room for one thing beside it and one at the right. Going back defaults to
+/// the path one level up ("/players/abc" to "/players").
+class BackHeader extends StatelessWidget {
+  const BackHeader(this.label, {super.key, this.onBack, this.beside, this.trailing});
+
+  final String label;
+  final VoidCallback? onBack;
+
+  /// Sits right after the label (the SAMPLE stamp).
+  final Widget? beside;
+  final Widget? trailing;
+
+  void _up(BuildContext context) {
+    final segments = GoRouterState.of(context).uri.pathSegments;
+    context.go(segments.length <= 1 ? '/' : '/${segments.take(segments.length - 1).join('/')}');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final back = Transform.translate(
+      offset: const Offset(-6, 0),
+      child: Pressable(
+        onTap: onBack ?? () => _up(context),
+        label: 'Back to $label',
+        builder: (context, down, focused) => Opacity(
+          opacity: down ? 0.7 : 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const BBIcon(BBGlyph.back, size: 24, color: BB.cream),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: BB.labelStyle(17, height: 1),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    // Sample data says so at the right, as the tab screens do.
+    final right = trailing ?? (Repo.isDemo && !BB.isWide(context) ? const Stamp('SAMPLE DATA') : null);
+    return SizedBox(
+      height: BB.isWide(context) ? 48 : 62,
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(child: back),
+                if (beside != null) ...[const SizedBox(width: 6), beside!],
+              ],
+            ),
+          ),
+          if (right != null) ...[const SizedBox(width: 12), right],
+        ],
+      ),
+    );
+  }
+}
+/// What an address that leads nowhere shows, and what a screen shows for a
+/// player or showcase that isn't there.
+class NotFoundScreen extends StatelessWidget {
+  const NotFoundScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => PageFrame(
+        children: [
+          const SizedBox(height: 56),
+          Text('Nothing here.', style: BB.title(BB.isWide(context) ? 44 : 34, drop: 4)),
+          const SizedBox(height: 6),
+          TextLink('Home', onTap: () => context.go('/')),
         ],
       );
-}
-
-Color awardColor(String type) => switch (type) {
-      'mvp' => BB.lemon,
-      'topPitcher' => BB.blue,
-      'topHitter' => BB.coral,
-      'eliteDefender' => BB.mint,
-      _ => BB.grape,
-    };
-
-class AwardBadge extends StatelessWidget {
-  const AwardBadge(this.award, {super.key});
-  final Award award;
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: awardColor(award.type),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: BB.ink, width: 2),
-          boxShadow: const [BoxShadow(color: BB.ink, offset: Offset(0, 3))],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.emoji_events, size: 18, color: BB.ink),
-            const SizedBox(width: 6),
-            Text(award.label, style: BB.labelStyle(14, color: BB.ink)),
-          ],
-        ),
-      );
-}
-
-/// A loading spinner or an error, for StreamBuilders.
-Widget? streamState(AsyncSnapshot<Object?> s) {
-  if (s.hasError) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Text("Couldn't load this. ${s.error}", style: const TextStyle(color: BB.accent)),
-    );
-  }
-  if (!s.hasData) {
-    return const Padding(
-      padding: EdgeInsets.all(40),
-      child: Center(child: CircularProgressIndicator()),
-    );
-  }
-  return null;
 }

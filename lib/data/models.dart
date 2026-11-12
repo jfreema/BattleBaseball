@@ -42,6 +42,7 @@ class Player {
     this.reportedVelo,
     this.publicProfile = false,
     this.fullName = false,
+    this.jersey,
   });
 
   final String id;
@@ -57,6 +58,9 @@ class Player {
   final double? reportedVelo;
   final bool publicProfile;
   final bool fullName;
+
+  /// The number the player usually wears, if they have one.
+  final int? jersey;
 
   String get name => '$firstName $lastName'.trim();
 
@@ -81,6 +85,7 @@ class Player {
       reportedVelo: (m['reportedVelo'] as num?)?.toDouble(),
       publicProfile: m['publicProfile'] as bool? ?? false,
       fullName: m['fullName'] as bool? ?? false,
+      jersey: (m['jersey'] as num?)?.toInt(),
     );
   }
 
@@ -97,7 +102,89 @@ class Player {
         'reportedVelo': reportedVelo,
         'publicProfile': publicProfile,
         'fullName': fullName,
+        'jersey': jersey,
         'publicName': publicName,
+      };
+
+  /// What goes in publicProfiles/{id} when a guardian turns the profile on.
+  PublicProfile toPublic() => PublicProfile(
+        id: id,
+        name: publicName,
+        gradYear: gradYear,
+        positions: positions,
+        bats: bats,
+        throws: throws,
+        state: state,
+        jersey: jersey,
+      );
+}
+
+/// The part of a player anyone may see, kept in its own document
+/// (publicProfiles/{playerId}) so the public never reads the player record,
+/// which holds the full last name. It exists only while a guardian has the
+/// public profile switched on.
+class PublicProfile {
+  const PublicProfile({
+    required this.id,
+    required this.name,
+    this.gradYear,
+    this.positions = const [],
+    this.bats = 'R',
+    this.throws = 'R',
+    this.state = '',
+    this.jersey,
+    this.sample = false,
+  });
+
+  final String id;
+
+  /// First name and last initial, or the full name if the guardian chose it.
+  final String name;
+  final int? gradYear;
+  final List<String> positions;
+  final String bats;
+  final String throws;
+  final String state;
+  final int? jersey;
+
+  /// True for the built-in example profile shown before real results exist.
+  final bool sample;
+
+  String get initials {
+    final parts = name.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    final first = parts.first.substring(0, 1);
+    final last = parts.length > 1 ? parts.last.substring(0, 1) : '';
+    return '$first$last'.toUpperCase();
+  }
+
+  /// Positions as a card prints them: a pitcher is "RHP" or "LHP".
+  List<String> get positionCodes => [
+        for (final p in positions) p == 'P' ? '${throws == 'L' ? 'L' : 'R'}HP' : p,
+      ];
+
+  static PublicProfile fromDoc(DocumentSnapshot<Json> d) {
+    final m = d.data() ?? const {};
+    return PublicProfile(
+      id: d.id,
+      name: m['name'] as String? ?? '',
+      gradYear: (m['gradYear'] as num?)?.toInt(),
+      positions: _strings(m['positions']),
+      bats: m['bats'] as String? ?? 'R',
+      throws: m['throws'] as String? ?? 'R',
+      state: m['state'] as String? ?? '',
+      jersey: (m['jersey'] as num?)?.toInt(),
+    );
+  }
+
+  Json toJson() => {
+        'name': name,
+        'gradYear': gradYear,
+        'positions': positions,
+        'bats': bats,
+        'throws': throws,
+        'state': state,
+        if (jersey != null) 'jersey': jersey,
       };
 }
 
@@ -385,6 +472,139 @@ class Award {
     );
   }
 }
+
+/// One player's game stats at one showcase, entered by the scorekeeper:
+/// statLines/{eventId}_{playerId}.
+class StatLine {
+  const StatLine({
+    required this.id,
+    required this.eventId,
+    required this.playerId,
+    this.eventName = '',
+    this.publicName = '',
+    this.divisionName = '',
+    this.gradYear,
+    this.published = false,
+    this.ab = 0,
+    this.h = 0,
+    this.hr = 0,
+    this.rbi = 0,
+    this.r = 0,
+    this.bb = 0,
+    this.outs = 0,
+    this.k = 0,
+    this.pbb = 0,
+    this.recordedAt,
+  });
+
+  final String id;
+  final String eventId;
+  final String eventName;
+  final String playerId;
+  final String publicName;
+  final String divisionName;
+  final int? gradYear;
+  final bool published;
+
+  // Batting.
+  final int ab;
+  final int h;
+  final int hr;
+  final int rbi;
+  final int r;
+  final int bb;
+
+  // Pitching: outs recorded (innings times three), strikeouts, walks.
+  final int outs;
+  final int k;
+  final int pbb;
+  final DateTime? recordedAt;
+
+  bool get hasBatting => ab + h + hr + rbi + r + bb > 0;
+  bool get hasPitching => outs + k + pbb > 0;
+
+  /// ".412", or ".000" before the first at-bat.
+  String get avg => battingAverage(h, ab);
+
+  /// "6.0", "4.1", "0.2": innings the way a scorebook writes them.
+  String get ip => inningsPitched(outs);
+
+  /// A player's lines added up across showcases.
+  static StatLine total(Iterable<StatLine> lines) {
+    var ab = 0, h = 0, hr = 0, rbi = 0, r = 0, bb = 0, outs = 0, k = 0, pbb = 0;
+    for (final l in lines) {
+      ab += l.ab;
+      h += l.h;
+      hr += l.hr;
+      rbi += l.rbi;
+      r += l.r;
+      bb += l.bb;
+      outs += l.outs;
+      k += l.k;
+      pbb += l.pbb;
+    }
+    return StatLine(
+      id: 'total',
+      eventId: '',
+      playerId: lines.isEmpty ? '' : lines.first.playerId,
+      ab: ab,
+      h: h,
+      hr: hr,
+      rbi: rbi,
+      r: r,
+      bb: bb,
+      outs: outs,
+      k: k,
+      pbb: pbb,
+    );
+  }
+
+  static StatLine fromDoc(DocumentSnapshot<Json> d) {
+    final m = d.data() ?? const {};
+    int n(String key) => (m[key] as num?)?.toInt() ?? 0;
+    return StatLine(
+      id: d.id,
+      eventId: m['eventId'] as String? ?? '',
+      eventName: m['eventName'] as String? ?? '',
+      playerId: m['playerId'] as String? ?? '',
+      publicName: m['publicName'] as String? ?? '',
+      divisionName: m['divisionName'] as String? ?? '',
+      gradYear: (m['gradYear'] as num?)?.toInt(),
+      published: m['published'] as bool? ?? false,
+      ab: n('ab'),
+      h: n('h'),
+      hr: n('hr'),
+      rbi: n('rbi'),
+      r: n('r'),
+      bb: n('bb'),
+      outs: n('outs'),
+      k: n('k'),
+      pbb: n('pbb'),
+      recordedAt: _date(m['recordedAt']),
+    );
+  }
+
+  /// The numbers alone, for saving.
+  Json numbers() => {
+        'ab': ab,
+        'h': h,
+        'hr': hr,
+        'rbi': rbi,
+        'r': r,
+        'bb': bb,
+        'outs': outs,
+        'k': k,
+        'pbb': pbb,
+      };
+}
+
+String battingAverage(int h, int ab) {
+  if (ab <= 0) return '.000';
+  final s = (h / ab).toStringAsFixed(3);
+  return s.startsWith('0') ? s.substring(1) : s;
+}
+
+String inningsPitched(int outs) => '${outs ~/ 3}.${outs % 3}';
 
 class PaymentSettings {
   const PaymentSettings({this.venmo = '', this.cashtag = '', this.payTo = ''});

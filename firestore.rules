@@ -103,13 +103,51 @@ service cloud.firestore {
 
     // ---------- Players ----------
 
+    // The player record holds the full last name, so the public never reads
+    // it. What the public may see lives in publicProfiles, below.
     match /players/{playerId} {
-      allow read: if resource.data.publicProfile == true
-        || (signedIn() && (me() in resource.data.guardianUids || isAdmin()));
+      allow read: if signedIn() && (me() in resource.data.guardianUids || isAdmin());
       allow create: if signedIn() && request.resource.data.guardianUids == [me()];
       allow update: if signedIn() && me() in resource.data.guardianUids
         && request.resource.data.guardianUids == resource.data.guardianUids;
       allow delete: if signedIn() && me() in resource.data.guardianUids;
+    }
+
+    function guardianOf(playerId) {
+      return signedIn() && exists(doc('players/' + playerId))
+        && me() in get(doc('players/' + playerId)).data.guardianUids;
+    }
+
+    // A player's public profile: the display name the guardian chose, grad
+    // year, positions, bats and throws, and state. A guardian writes it in
+    // the same batch that switches the profile on (so the rule reads the
+    // player as it will be) and deletes it when they switch it off.
+    function validPublicProfile(playerId) {
+      let p = getAfter(doc('players/' + playerId)).data;
+      return signedIn()
+        && me() in p.guardianUids
+        && p.publicProfile == true
+        && request.resource.data.keys().hasOnly(
+             ['name', 'gradYear', 'positions', 'bats', 'throws', 'state', 'jersey', 'updatedAt'])
+        && request.resource.data.name == p.publicName;
+    }
+
+    match /publicProfiles/{playerId} {
+      allow read: if true;
+      allow create, update: if validPublicProfile(playerId);
+      allow delete: if guardianOf(playerId) || isAdmin();
+    }
+
+    // A guardian who switches a profile public or private may restamp just
+    // those two fields on the player's registrations and results, and only
+    // to what the player record now says.
+    function guardianSetsVisibility() {
+      let p = get(doc('players/' + resource.data.playerId)).data;
+      return signedIn()
+        && onlyChanges(['publicName', 'playerPublic'])
+        && me() in p.guardianUids
+        && request.resource.data.playerPublic == p.publicProfile
+        && request.resource.data.publicName in ['', p.publicName];
     }
 
     match /playerPrivate/{playerId} {
@@ -148,7 +186,8 @@ service cloud.firestore {
         || (signedIn() && resource.data.guardianUid == me() && onlyChanges(['alreadyPaid'])
             && request.resource.data.alreadyPaid == true)
         // Registering again after a released or cancelled spot.
-        || (resource.data.status in ['released', 'cancelled'] && validNewRegistration(regId));
+        || (resource.data.status in ['released', 'cancelled'] && validNewRegistration(regId))
+        || guardianSetsVisibility();
       allow delete: if isAdmin();
     }
 
@@ -164,14 +203,30 @@ service cloud.firestore {
     match /measurements/{id} {
       allow read: if resource.data.published == true || isEventStaff(resource.data.eventId);
       allow create: if isEventStaff(request.resource.data.eventId) && request.resource.data.recordedBy == me();
-      allow update: if isEventAdmin(resource.data.eventId);
+      allow update: if isEventAdmin(resource.data.eventId) || guardianSetsVisibility();
       allow delete: if isEventStaff(resource.data.eventId);
     }
 
     match /awards/{id} {
       allow read: if resource.data.published == true || isEventStaff(resource.data.eventId);
       allow create: if isEventStaff(request.resource.data.eventId) && request.resource.data.recordedBy == me();
-      allow update: if isEventAdmin(resource.data.eventId);
+      allow update: if isEventAdmin(resource.data.eventId) || guardianSetsVisibility();
+      allow delete: if isEventStaff(resource.data.eventId);
+    }
+
+    // Game stats: one line per player per event, kept by the scorekeeper.
+    // Staff can correct a line; only an event admin's publish makes it public.
+    match /statLines/{id} {
+      allow read: if resource.data.published == true || isEventStaff(resource.data.eventId);
+      allow create: if isEventStaff(request.resource.data.eventId)
+        && id == request.resource.data.eventId + '_' + request.resource.data.playerId
+        && request.resource.data.recordedBy == me()
+        && (request.resource.data.published == false || isEventAdmin(request.resource.data.eventId));
+      allow update: if (isEventStaff(resource.data.eventId)
+          && request.resource.data.eventId == resource.data.eventId
+          && request.resource.data.playerId == resource.data.playerId
+          && (request.resource.data.published == resource.data.published || isEventAdmin(resource.data.eventId)))
+        || guardianSetsVisibility();
       allow delete: if isEventStaff(resource.data.eventId);
     }
 

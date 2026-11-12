@@ -1,118 +1,436 @@
+// Staff tools: the hub, showcase setup, staff, payments and the owner's
+// screens, and the few widgets these share with the event-day screen.
+// Volunteers use them on a phone, so every screen is a short list of big
+// rows and says very little.
+import 'dart:async';
+
 import 'package:battle_baseball/data/models.dart';
 import 'package:battle_baseball/data/repo.dart';
 import 'package:battle_baseball/data/session.dart';
 import 'package:battle_baseball/design/bb.dart';
+import 'package:battle_baseball/design/card.dart';
 import 'package:battle_baseball/screens/common.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// The admin hub. What shows depends on the role: you (owner) see
-/// everything; Battle Baseball admins see every event; event admins and
-/// staff see only the events they're named on.
+/// Staff screens are forms and lists; they read best in a narrow column.
+const staffWidth = 680.0;
+
+/// The frame of a staff screen: back to the hub, a title, then the content.
+class StaffPage extends StatelessWidget {
+  const StaffPage({
+    super.key,
+    required this.title,
+    required this.children,
+    this.trailing,
+    this.back = 'Staff tools',
+    this.backTo = '/admin',
+  });
+
+  final String title;
+  final List<Widget> children;
+
+  /// Sits at the right of the title.
+  final Widget? trailing;
+  final String back;
+
+  /// Staff paths don't nest the way their screens do, so back is spelled out.
+  final String backTo;
+
+  @override
+  Widget build(BuildContext context) => PageFrame(
+        column: staffWidth,
+        children: [
+          BackHeader(back, onBack: () => context.go(backTo)),
+          PageTitle(title, trailing: trailing),
+          ...children,
+        ],
+      );
+}
+
+/// Listens to a stream made once, so a rebuild never resubscribes, and shows
+/// the spinner or a quiet line until there is something to build from.
+class LiveData<T extends Object> extends StatefulWidget {
+  const LiveData({super.key, required this.stream, required this.builder});
+
+  final Stream<T> Function() stream;
+  final Widget Function(BuildContext context, T data) builder;
+
+  @override
+  State<LiveData<T>> createState() => _LiveDataState<T>();
+}
+
+class _LiveDataState<T extends Object> extends State<LiveData<T>> {
+  late final Stream<T> _stream = widget.stream();
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<T>(
+        stream: _stream,
+        builder: (context, snap) {
+          if (snap.hasError) return const Quiet("Couldn't load this.");
+          final data = snap.data;
+          if (data == null) return const LoadingField();
+          return widget.builder(context, data);
+        },
+      );
+}
+
+/// A paper row: a name, a small line under it, and room at either end.
+class StaffRow extends StatelessWidget {
+  const StaffRow(
+    this.title, {
+    super.key,
+    this.sub,
+    this.leading,
+    this.trailing,
+    this.onTap,
+    this.color = BB.cream,
+    this.chevron = false,
+    this.sink = true,
+  });
+
+  final String title;
+  final String? sub;
+  final Widget? leading;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final Color color;
+
+  /// Ends the row in a chevron, for a row that leads somewhere.
+  final bool chevron;
+
+  /// Turn off when [trailing] is a button of its own.
+  final bool sink;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Paper(
+          onTap: onTap,
+          sink: sink,
+          color: color,
+          radius: 14,
+          padding: EdgeInsets.fromLTRB(leading == null ? 16 : 10, 8, 12, 8),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Row(
+              children: [
+                if (leading != null) ...[leading!, const SizedBox(width: 12)],
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: BB.labelStyle(19, color: BB.ink, height: 1.1),
+                      ),
+                      if (sub != null && sub!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            sub!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: BB.bodyStyle(14, color: BB.ink2, height: 1.25),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (trailing != null) ...[const SizedBox(width: 10), trailing!],
+                if (chevron) ...[
+                  const SizedBox(width: 8),
+                  const BBIcon(BBGlyph.forward, size: 22, color: BB.ink),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+/// The quiet link that keeps a first-timer's instructions off the screen.
+class HowThisWorks extends StatelessWidget {
+  const HowThisWorks(this.items, {super.key});
+
+  final List<FinePrintItem> items;
+
+  @override
+  Widget build(BuildContext context) =>
+      TextLink('How this works', onTap: () => showFinePrint(context, items: items, title: 'How this works', legal: false));
+}
+
+/// Runs a write and says so if it fails, so a dropped connection at the
+/// field never passes for a saved change. True when it went through.
+Future<bool> attempt(BuildContext context, Future<void> Function() write, {String? done}) async {
+  try {
+    await write();
+    if (done != null && context.mounted) toast(context, done);
+    return true;
+  } catch (_) {
+    if (context.mounted) toast(context, "Couldn't save. Try again.");
+    return false;
+  }
+}
+
+/// One field of a [showPrompt] dialog.
+class PromptField {
+  const PromptField(this.label, {this.initial = '', this.hint, this.keyboard, this.big = false});
+
+  final String label;
+  final String initial;
+  final String? hint;
+  final TextInputType? keyboard;
+
+  /// Sets what's typed in large numerals, for a jersey number.
+  final bool big;
+}
+
+/// A small dialog: a title, a few fields, and two buttons. Answers with what
+/// was typed in each field, or null when it was cancelled.
+Future<List<String>?> showPrompt(
+  BuildContext context, {
+  required String title,
+  String? note,
+  List<PromptField> fields = const [],
+  required String action,
+  String cancel = 'Cancel',
+}) =>
+    showDialog<List<String>>(
+      context: context,
+      builder: (_) => _Prompt(title: title, note: note, fields: fields, action: action, cancel: cancel),
+    );
+
+class _Prompt extends StatefulWidget {
+  const _Prompt({
+    required this.title,
+    required this.note,
+    required this.fields,
+    required this.action,
+    required this.cancel,
+  });
+
+  final String title;
+  final String? note;
+  final List<PromptField> fields;
+  final String action;
+  final String cancel;
+
+  @override
+  State<_Prompt> createState() => _PromptState();
+}
+
+class _PromptState extends State<_Prompt> {
+  late final _controllers = [for (final f in widget.fields) TextEditingController(text: f.initial)];
+
+  @override
+  void dispose() {
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _done() => Navigator.of(context).pop([for (final c in _controllers) c.text]);
+
+  @override
+  Widget build(BuildContext context) {
+    final last = widget.fields.length - 1;
+    return Dialog(
+      // Wider than the default on a small phone, so the buttons fit side by side.
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(header: true, child: Text(widget.title, style: BB.title(26))),
+              if (widget.note != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(widget.note!, style: BB.bodyStyle(16)),
+                ),
+              for (final (i, f) in widget.fields.indexed)
+                Padding(
+                  padding: EdgeInsets.only(top: i == 0 ? 16 : 12),
+                  child: TextField(
+                    controller: _controllers[i],
+                    autofocus: i == 0,
+                    keyboardType: f.keyboard,
+                    textInputAction: i == last ? TextInputAction.done : TextInputAction.next,
+                    style: f.big ? BB.lilita(30, color: BB.cream, height: 1.2) : null,
+                    decoration: InputDecoration(labelText: f.label, hintText: f.hint),
+                    onSubmitted: i == last ? (_) => _done() : null,
+                  ),
+                ),
+              const SizedBox(height: 20),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  BBButton.quiet(widget.cancel, onPressed: () => Navigator.of(context).pop()),
+                  BBButton.primary(widget.action, onPressed: _done),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Widget _stack(List<Widget> children) => Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    );
+
+String _shortStatus(String status) => switch (status) {
+      'draft' => 'Draft',
+      'open' => 'Open',
+      'closed' => 'Closed',
+      'live' => 'Live',
+      'final' => 'Final',
+      'rainedOut' => 'Rained out',
+      _ => status,
+    };
+
+String _payApp(Registration r) => r.paidVia == 'cashapp' ? 'Cash App' : 'Venmo';
+
+String _joined(Iterable<String?> parts) =>
+    parts.where((p) => p != null && p.trim().isNotEmpty).join(' · ');
+
+/// The hub. What shows depends on the role: the owner sees everything,
+/// Battle Baseball admins see every showcase, and event admins and
+/// volunteers see only the showcases they're named on.
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     final s = Session.instance;
     return ListenableBuilder(
       listenable: s,
-      builder: (context, _) => Scaffold(
-        appBar: AppBar(title: const Text('Admin tools')),
-        body: PageBody(children: [
-          Eyebrow(s.isOwner
-              ? 'Owner'
-              : s.isAdmin
-                  ? 'Battle Baseball admin'
-                  : 'Event staff'),
-          if (s.hasStaffTools && !s.isAdmin)
-            const Text('You can run the events you were added to.', style: TextStyle(color: BB.muted)),
-          const SizedBox(height: 8),
-          Wrap(spacing: 10, runSpacing: 10, children: [
-            if (s.isAdmin)
-              CandyButton(
-                small: true,
-                icon: Icons.add,
-                label: 'New event',
-                onPressed: () => context.go('/admin/events/new'),
-              ),
-            CandyButton.secondary(
-              small: true,
-              icon: Icons.payments_outlined,
-              label: 'Payments',
-              onPressed: () => context.go('/admin/payments'),
-            ),
+      builder: (context, _) {
+        // Volunteers have nothing to do with payments, so they aren't shown the door.
+        final payments = s.isAdmin || s.assignments.any((a) => a.role == 'eventAdmin');
+        return StaffPage(
+          title: 'Staff tools',
+          back: 'Account',
+          backTo: '/account',
+          trailing: s.isAdmin
+              ? Pill(s.isOwner ? 'Owner' : 'Admin', color: BB.lemon)
+              : const Pill('Event staff'),
+          children: [
+            if (payments)
+              StaffRow('Payments', chevron: true, onTap: () => context.go('/admin/payments')),
             if (s.isOwner) ...[
-              CandyButton.secondary(
-                small: true,
-                icon: Icons.fact_check_outlined,
-                label: 'Payment check',
-                onPressed: () => context.go('/admin/payment-check'),
-              ),
-              CandyButton.secondary(
-                small: true,
-                icon: Icons.group_outlined,
-                label: 'Admins',
-                onPressed: () => context.go('/admin/admins'),
-              ),
-              CandyButton.secondary(
-                small: true,
-                icon: Icons.settings_outlined,
-                label: 'Payment settings',
-                onPressed: () => context.go('/admin/settings'),
-              ),
+              StaffRow('Payment check', chevron: true, onTap: () => context.go('/admin/payment-check')),
+              StaffRow('Admins', chevron: true, onTap: () => context.go('/admin/admins')),
+              StaffRow('Payment settings', chevron: true, onTap: () => context.go('/admin/settings')),
             ],
-          ]),
-          const SectionLabel('Events'),
-          StreamBuilder<List<BBEvent>>(
-            stream: s.isAdmin ? Repo.instance.allEvents() : Repo.instance.publicEvents(),
-            builder: (context, es) {
-              final w = streamState(es);
-              if (w != null) return w;
-              final list = es.data!.where((e) => s.isEventStaff(e.id)).toList();
-              if (list.isEmpty) return const EmptyNote('No events yet.');
-              return Column(children: [
-                for (final e in list)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: GumCard(
-                      edge: statusColor(e.status),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Row(children: [
-                          Expanded(child: Text(e.name, style: BB.title(20))),
-                          StatusChip(statusLabel(e.status), color: statusColor(e.status)),
-                        ]),
-                        Text('${fmtDate(e.start)} · ${e.city}', style: const TextStyle(color: BB.cardMuted)),
-                        const SizedBox(height: 10),
-                        Wrap(spacing: 8, runSpacing: 8, children: [
-                          CandyButton(
-                            small: true,
-                            label: 'Run event',
-                            icon: Icons.sports_baseball,
-                            onPressed: () => context.go('/admin/events/${e.id}/run'),
-                          ),
-                          if (s.isEventAdmin(e.id)) ...[
-                            CandyButton.secondary(
-                              small: true,
-                              label: 'Edit',
-                              icon: Icons.edit,
-                              onPressed: () => context.go('/admin/events/${e.id}'),
-                            ),
-                            CandyButton.secondary(
-                              small: true,
-                              label: 'Staff',
-                              icon: Icons.badge_outlined,
-                              onPressed: () => context.go('/admin/events/${e.id}/staff'),
-                            ),
-                          ],
-                        ]),
-                      ]),
-                    ),
+            if (payments) const SizedBox(height: 22),
+            SectionTitle(
+              'Showcases',
+              trailing: s.isAdmin
+                  ? BBButton.paper(
+                      'New',
+                      small: true,
+                      icon: const BBIcon(BBGlyph.plus),
+                      onPressed: () => context.go('/admin/events/new'),
+                    )
+                  : null,
+            ),
+            LiveData<List<BBEvent>>(
+              // Drafts are an admin's to read; ask again if the role changes.
+              key: ValueKey(s.isAdmin),
+              stream: () => s.isAdmin ? Repo.instance.allEvents() : Repo.instance.publicEvents(),
+              builder: (context, events) {
+                final mine = events.where((e) => s.isEventStaff(e.id));
+                // What's coming first, then what's done, newest first.
+                final list = [
+                  ...mine.where((e) => e.status != 'final'),
+                  ...mine.where((e) => e.status == 'final').toList().reversed,
+                ];
+                if (list.isEmpty) return const Quiet('No showcases yet.');
+                return _stack([
+                  for (final e in list) _EventRow(event: e, canEdit: s.isEventAdmin(e.id)),
+                ]);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _EventRow extends StatelessWidget {
+  const _EventRow({required this.event, required this.canEdit});
+
+  final BBEvent event;
+  final bool canEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = event;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Paper(
+        padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: Text(e.name, style: BB.lilita(22))),
+                const SizedBox(width: 10),
+                Pill(_shortStatus(e.status), color: e.isOpen ? BB.mint : BB.cream),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _joined([e.start == null ? 'No date' : fmtDate(e.start), e.city]),
+                style: BB.bodyStyle(14, color: BB.ink2, height: 1.25),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                BBButton.primary(
+                  'Run',
+                  small: true,
+                  onPressed: () => context.go('/admin/events/${e.id}/run'),
+                ),
+                if (canEdit) ...[
+                  BBButton.paper(
+                    'Edit',
+                    small: true,
+                    onPressed: () => context.go('/admin/events/${e.id}'),
                   ),
-              ]);
-            },
-          ),
-        ]),
+                  BBButton.paper(
+                    'Staff',
+                    small: true,
+                    onPressed: () => context.go('/admin/events/${e.id}/staff'),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -141,7 +459,22 @@ class _EventFormScreenState extends State<EventFormScreen> {
   bool _skills = false;
   bool _resultsPublished = false;
   bool _loaded = false;
+  bool _missing = false;
   bool _busy = false;
+
+  static const _statuses = ['draft', 'open', 'closed', 'live', 'final', 'rainedOut'];
+
+  static const _help = [
+    FinePrintItem('Hidden from families.', title: 'Draft'),
+    FinePrintItem('Listed and taking sign-ups.', title: 'Open'),
+    FinePrintItem('Listed, sign-ups off.', title: 'Closed'),
+    FinePrintItem('Shows as today.', title: 'Live'),
+    FinePrintItem('Set for you when results are published.', title: 'Final'),
+    FinePrintItem(
+      'Each one has its own spots and waitlist. Add them after you create the showcase.',
+      title: 'Age groups',
+    ),
+  ];
 
   @override
   void initState() {
@@ -150,7 +483,11 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _loaded = true;
     } else {
       Repo.instance.event(widget.eventId!).first.then((e) {
-        if (e == null || !mounted) return;
+        if (!mounted) return;
+        if (e == null) {
+          setState(() => _missing = true);
+          return;
+        }
         setState(() {
           _name.text = e.name;
           _city.text = e.city;
@@ -167,6 +504,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
           _resultsPublished = e.resultsPublished;
           _loaded = true;
         });
+      }, onError: (Object _) {
+        if (mounted) setState(() => _missing = true);
       });
     }
   }
@@ -192,6 +531,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
       context: context,
       initialTime: TimeOfDay.fromDateTime(_start ?? DateTime(2026, 1, 1, 8)),
     );
+    if (!mounted) return;
     setState(() => _start = DateTime(d.year, d.month, d.day, t?.hour ?? 8, t?.minute ?? 0));
   }
 
@@ -219,439 +559,615 @@ class _EventFormScreenState extends State<EventFormScreen> {
       if (!mounted) return;
       toast(context, 'Saved');
       if (widget.eventId == null) context.go('/admin/events/$id');
-    } catch (err) {
-      if (mounted) toast(context, "Couldn't save: $err");
+    } catch (_) {
+      if (mounted) toast(context, "Couldn't save. Try again.");
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
+  Widget _field(
+    TextEditingController c,
+    String label, {
+    int lines = 1,
+    TextInputType? type,
+    String? hint,
+    String? prefix,
+    bool required = false,
+    TextCapitalization caps = TextCapitalization.sentences,
+  }) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: TextFormField(
+          controller: c,
+          minLines: lines,
+          maxLines: lines == 1 ? 1 : lines + 4,
+          keyboardType: type,
+          textCapitalization: caps,
+          decoration: InputDecoration(labelText: label, hintText: hint, prefixText: prefix),
+          validator: required ? (v) => (v ?? '').trim().isEmpty ? 'Required' : null : null,
+        ),
+      );
+
+  /// Looks like the fields around it; tapping it opens the pickers.
+  Widget _dateField() => Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Pressable(
+                onTap: _pickDate,
+                builder: (context, down, focused) => InputDecorator(
+                  isEmpty: _start == null,
+                  isFocused: focused,
+                  decoration: const InputDecoration(labelText: 'Date and time'),
+                  child: Text(
+                    _start == null ? '' : fmtDateTime(_start),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ),
+              ),
+            ),
+            if (_start != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: IconTap(
+                  BBGlyph.close,
+                  label: 'Clear date',
+                  color: BB.cream,
+                  onTap: () => setState(() => _start = null),
+                ),
+              ),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final editing = widget.eventId != null;
-    Widget field(TextEditingController c, String label, {int lines = 1, TextInputType? type, bool required = false}) =>
-        Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: TextFormField(
-            controller: c,
-            minLines: lines,
-            maxLines: lines == 1 ? 1 : lines + 4,
-            keyboardType: type,
-            decoration: InputDecoration(labelText: label),
-            validator: required ? (v) => (v ?? '').trim().isEmpty ? 'Required' : null : null,
+    if (_missing) return const NotFoundScreen();
+    if (!_loaded) return const LoadingField();
+    return Form(
+      key: _form,
+      child: StaffPage(
+        title: editing ? 'Edit showcase' : 'New showcase',
+        children: [
+          _field(_name, 'Name', required: true, caps: TextCapitalization.words),
+          _dateField(),
+          _field(_city, 'City', caps: TextCapitalization.words),
+          _field(_venue, 'Venue', caps: TextCapitalization.words),
+          _field(_address, 'Address', caps: TextCapitalization.words),
+          _field(_ages, 'Ages', hint: '9U to 14U'),
+          _field(
+            _price,
+            'Price',
+            prefix: '\$',
+            type: const TextInputType.numberWithOptions(decimal: true),
           ),
-        );
-    return Scaffold(
-      appBar: AppBar(title: Text(editing ? 'Edit event' : 'New event')),
-      body: !_loaded
-          ? const Center(child: CircularProgressIndicator())
-          : Form(
-              key: _form,
-              child: PageBody(children: [
-                field(_name, 'Event name', required: true),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: GumCard(
-                    edge: BB.blue,
-                    onTap: _pickDate,
-                    child: Row(children: [
-                      const Icon(Icons.event),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(_start == null ? 'Pick the date and start time' : fmtDateTime(_start),
-                            style: BB.labelStyle(16)),
-                      ),
-                      if (_start != null)
-                        IconButton(
-                          tooltip: 'Clear date',
-                          icon: const Icon(Icons.close),
-                          onPressed: () => setState(() => _start = null),
-                        ),
-                    ]),
-                  ),
+          _field(_host, 'Host team', caps: TextCapitalization.words),
+          _field(_raising, 'Raising money for'),
+          _field(_desc, 'Details', lines: 4),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _skills,
+            onChanged: (v) => setState(() => _skills = v),
+            title: const Text('Skills contest'),
+          ),
+          const SizedBox(height: 10),
+          Text('STATUS', style: BB.caps(12.5)),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final st in _statuses)
+                BBChip(
+                  _shortStatus(st),
+                  selected: _status == st,
+                  onTap: () => setState(() => _status = st),
                 ),
-                field(_city, 'City'),
-                field(_venue, 'Venue (field complex)'),
-                field(_address, 'Address'),
-                field(_ages, 'Age groups (e.g. 10U, 12U, 14U)'),
-                field(_price, 'Price per player (\$), blank if not set yet',
-                    type: const TextInputType.numberWithOptions(decimal: true)),
-                field(_host, 'Host team'),
-                field(_raising, 'What the host team is raising money for'),
-                field(_desc, 'Description, schedule, and what to bring', lines: 4),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _skills,
-                  onChanged: (v) => setState(() => _skills = v),
-                  title: const Text('Opt-in skills contest (pop time, 40-yard dash)'),
-                ),
-                const SizedBox(height: 8),
-                Text('Status', style: BB.labelStyle(15, color: BB.muted)),
-                const SizedBox(height: 6),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  for (final st in ['draft', 'open', 'closed', 'live', 'final', 'rainedOut'])
-                    ChoiceChip(
-                      label: Text(statusLabel(st)),
-                      selected: _status == st,
-                      onSelected: (_) => setState(() => _status = st),
-                    ),
-                ]),
-                const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: Text('Drafts are hidden from families. Open takes registrations.',
-                      style: TextStyle(color: BB.muted, fontSize: 14)),
-                ),
-                const SizedBox(height: 18),
-                CandyButton(expand: true, busy: _busy, label: editing ? 'Save event' : 'Create event', onPressed: _save),
-                if (editing) _Divisions(eventId: widget.eventId!),
-              ]),
-            ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const HowThisWorks(_help),
+          const SizedBox(height: 16),
+          BBButton.primary(editing ? 'Save' : 'Create', expand: true, busy: _busy, onPressed: _save),
+          if (editing) ...[
+            const SizedBox(height: 36),
+            _Divisions(eventId: widget.eventId!),
+          ],
+        ],
+      ),
     );
   }
 }
 
+/// A showcase's age groups, each with its own count of spots.
 class _Divisions extends StatelessWidget {
   const _Divisions({required this.eventId});
   final String eventId;
 
   Future<void> _edit(BuildContext context, {Division? d, int order = 0}) async {
-    final name = TextEditingController(text: d?.name ?? '');
-    final cap = TextEditingController(text: '${d?.capacity ?? 24}');
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text(d == null ? 'Add age group' : 'Edit age group'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(
-            controller: name,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'Name (e.g. 12U Gold)'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: cap,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Spots'),
-          ),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save')),
-        ],
-      ),
+    final answer = await showPrompt(
+      context,
+      title: d == null ? 'Add age group' : 'Edit age group',
+      fields: [
+        PromptField('Name', initial: d?.name ?? '', hint: '12U Gold'),
+        PromptField('Spots', initial: '${d?.capacity ?? 24}', keyboard: TextInputType.number),
+      ],
+      action: 'Save',
     );
-    if (ok != true || name.text.trim().isEmpty) return;
-    final capacity = int.tryParse(cap.text.trim()) ?? 24;
-    if (d == null) {
-      await Repo.instance.addDivision(eventId, name.text.trim(), capacity, order);
-    } else {
-      await Repo.instance.updateDivision(d.id, {'name': name.text.trim(), 'capacity': capacity});
-    }
+    if (answer == null || !context.mounted) return;
+    final name = answer[0].trim();
+    if (name.isEmpty) return;
+    final capacity = int.tryParse(answer[1].trim()) ?? 24;
+    await attempt(
+      context,
+      () => d == null
+          ? Repo.instance.addDivision(eventId, name, capacity, order)
+          : Repo.instance.updateDivision(d.id, {'name': name, 'capacity': capacity}),
+    );
   }
 
   @override
-  Widget build(BuildContext context) => StreamBuilder<List<Division>>(
-        stream: Repo.instance.divisionsFor(eventId),
-        builder: (context, s) {
-          final list = s.data ?? const <Division>[];
-          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const SectionLabel('Age groups and skill levels'),
-            for (final d in list)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: GumCard(
-                  edge: BB.grape,
-                  onTap: () => _edit(context, d: d),
-                  child: Row(children: [
-                    Expanded(
-                      child: Text('${d.name}\n${d.taken} of ${d.capacity} spots taken', style: BB.labelStyle(16)),
-                    ),
-                    IconButton(
-                      tooltip: 'Delete',
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: d.taken > 0 ? null : () => Repo.instance.deleteDivision(d.id),
-                    ),
-                  ]),
-                ),
-              ),
-            CandyButton.secondary(
+  Widget build(BuildContext context) => LiveData<List<Division>>(
+        key: ValueKey(eventId),
+        stream: () => Repo.instance.divisionsFor(eventId),
+        builder: (context, list) => _stack([
+          SectionTitle(
+            'Age groups',
+            trailing: BBButton.paper(
+              'Add',
               small: true,
-              icon: Icons.add,
-              label: 'Add age group',
+              icon: const BBIcon(BBGlyph.plus),
               onPressed: () => _edit(context, order: list.length),
             ),
-          ]);
-        },
+          ),
+          if (list.isEmpty) const Quiet('None yet.'),
+          for (final d in list)
+            StaffRow(
+              d.name,
+              sink: false,
+              onTap: () => _edit(context, d: d),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Pill('${d.taken} of ${d.capacity}'),
+                  // Only an empty age group can go.
+                  if (d.taken == 0)
+                    IconTap(
+                      BBGlyph.close,
+                      label: 'Delete ${d.name}',
+                      onTap: () => attempt(context, () => Repo.instance.deleteDivision(d.id)),
+                    ),
+                ],
+              ),
+            ),
+        ]),
       );
 }
 
-/// Choose the event's admins (owner and BB admins) and volunteers (any admin
-/// of the event).
+/// Asks for an email and finds the account behind it.
+Future<AppUser?> _findAccount(BuildContext context, String title) async {
+  final answer = await showPrompt(
+    context,
+    title: title,
+    fields: const [PromptField('Email', keyboard: TextInputType.emailAddress)],
+    action: 'Add',
+  );
+  if (answer == null || answer.first.trim().isEmpty) return null;
+  AppUser? user;
+  try {
+    user = await Repo.instance.userByEmail(answer.first);
+  } catch (_) {
+    if (context.mounted) toast(context, "Couldn't look that up. Try again.");
+    return null;
+  }
+  if (user == null && context.mounted) toast(context, 'No account with that email.');
+  return user;
+}
+
+String _person(String name, String email) => name.isEmpty ? email : name;
+
+/// A showcase's admins (chosen by the owner and Battle Baseball admins) and
+/// its volunteers (chosen by any admin of the showcase).
 class EventStaffScreen extends StatelessWidget {
   const EventStaffScreen({super.key, required this.eventId});
   final String eventId;
 
+  static const _help = [
+    FinePrintItem(
+      'Runs this showcase: payments, volunteers and publishing results.',
+      title: 'Admin',
+    ),
+    FinePrintItem('Check-in, radar, stats and awards. No payments.', title: 'Volunteer'),
+    FinePrintItem('They need an account first. Add them by the email they signed up with.'),
+  ];
+
   Future<void> _add(BuildContext context, String role) async {
-    final email = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text(role == 'eventAdmin' ? 'Add an event admin' : 'Add a volunteer'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('They need a Battle Baseball account first. Enter the email they signed up with.'),
-          const SizedBox(height: 12),
-          TextField(
-            controller: email,
-            autofocus: true,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Email'),
-          ),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Add')),
-        ],
-      ),
+    final u = await _findAccount(context, role == 'eventAdmin' ? 'Add an admin' : 'Add a volunteer');
+    if (u == null || !context.mounted) return;
+    await attempt(
+      context,
+      () => Repo.instance.assignStaff(eventId, u, role),
+      done: 'Added ${_person(u.name, u.email)}',
     );
-    if (ok != true) return;
-    final u = await Repo.instance.userByEmail(email.text);
-    if (!context.mounted) return;
-    if (u == null) {
-      toast(context, 'No account with that email yet. Ask them to sign up in the app first.');
-      return;
-    }
-    await Repo.instance.assignStaff(eventId, u, role);
-    if (context.mounted) toast(context, 'Added ${u.name.isEmpty ? u.email : u.name}');
   }
 
   @override
   Widget build(BuildContext context) {
     final s = Session.instance;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Event staff')),
-      body: StreamBuilder<List<StaffAssignment>>(
-        stream: Repo.instance.staffFor(eventId),
-        builder: (context, snap) {
-          final w = streamState(snap);
-          if (w != null) return w;
-          final list = snap.data!;
-          return PageBody(children: [
-            const Text(
-              'Event admins manage registrations, mark payments, add volunteers, and publish results '
-              'for this event only. Volunteers check players in and record velocities and awards, '
-              'with no access to payments.',
-              style: TextStyle(color: BB.muted),
-            ),
-            const SizedBox(height: 14),
-            Wrap(spacing: 10, runSpacing: 10, children: [
-              if (s.isAdmin)
-                CandyButton(small: true, label: 'Add event admin', onPressed: () => _add(context, 'eventAdmin')),
-              CandyButton.secondary(small: true, label: 'Add volunteer', onPressed: () => _add(context, 'staff')),
-            ]),
-            const SizedBox(height: 16),
-            if (list.isEmpty) const EmptyNote('No one added yet.'),
-            for (final a in list)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: GumCard(
-                  edge: a.role == 'eventAdmin' ? BB.coral : BB.blue,
-                  child: Row(children: [
-                    Expanded(
-                      child: Text(
-                        '${a.name.isEmpty ? a.email : a.name}\n${a.role == 'eventAdmin' ? 'Event admin' : 'Volunteer'} · ${a.email}',
-                        style: BB.labelStyle(15),
-                      ),
-                    ),
-                    if (s.isAdmin || a.role == 'staff')
-                      IconButton(
-                        tooltip: 'Remove',
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: () => Repo.instance.removeStaff(a.id),
-                      ),
-                  ]),
-                ),
+    return ListenableBuilder(
+      listenable: s,
+      builder: (context, _) => StaffPage(
+        title: 'Staff',
+        children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              BBButton.primary(
+                'Add volunteer',
+                small: true,
+                icon: const BBIcon(BBGlyph.plus),
+                onPressed: () => _add(context, 'staff'),
               ),
-          ]);
-        },
+              if (s.isAdmin)
+                BBButton.paper(
+                  'Add admin',
+                  small: true,
+                  icon: const BBIcon(BBGlyph.plus),
+                  onPressed: () => _add(context, 'eventAdmin'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          LiveData<List<StaffAssignment>>(
+            key: ValueKey(eventId),
+            stream: () => Repo.instance.staffFor(eventId),
+            builder: (context, staff) {
+              final list = [...staff]..sort((a, b) {
+                  if (a.role != b.role) return a.role == 'eventAdmin' ? -1 : 1;
+                  return _person(a.name, a.email)
+                      .toLowerCase()
+                      .compareTo(_person(b.name, b.email).toLowerCase());
+                });
+              return _stack([
+                if (list.isEmpty) const Quiet('No one yet.'),
+                for (final a in list)
+                  StaffRow(
+                    _person(a.name, a.email),
+                    sub: a.name.isEmpty ? null : a.email,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Pill(a.role == 'eventAdmin' ? 'Admin' : 'Volunteer'),
+                        if (s.isAdmin || a.role == 'staff')
+                          IconTap(
+                            BBGlyph.close,
+                            label: 'Remove ${_person(a.name, a.email)}',
+                            onTap: () => attempt(context, () => Repo.instance.removeStaff(a.id)),
+                          ),
+                      ],
+                    ),
+                  ),
+              ]);
+            },
+          ),
+          const SizedBox(height: 4),
+          const HowThisWorks(_help),
+        ],
       ),
     );
   }
 }
 
-/// Spots waiting on payment, holds ending soonest at the top.
+/// Every listed showcase's registrations as one list, for an event admin who
+/// can't read them all at once the way a Battle Baseball admin can.
+Stream<List<Registration>> _registrationsAcross(List<String> eventIds) {
+  if (eventIds.isEmpty) return Stream.value(const []);
+  final latest = <String, List<Registration>>{};
+  final subs = <StreamSubscription<List<Registration>>>[];
+  late final StreamController<List<Registration>> out;
+  out = StreamController<List<Registration>>(
+    onListen: () {
+      for (final id in eventIds) {
+        subs.add(Repo.instance.registrationsFor(id).listen(
+          (list) {
+            latest[id] = list;
+            // Wait until every showcase has answered once.
+            if (latest.length == eventIds.length) {
+              out.add([for (final l in latest.values) ...l]);
+            }
+          },
+          onError: out.addError,
+        ));
+      }
+    },
+    onCancel: () async {
+      for (final s in subs) {
+        await s.cancel();
+      }
+    },
+  );
+  return out.stream;
+}
+
+/// Spots waiting on payment, and the waitlist behind them.
 class PaymentsScreen extends StatelessWidget {
   const PaymentsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final s = Session.instance;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Payments')),
-      body: StreamBuilder<List<Registration>>(
-        stream: s.isAdmin ? Repo.instance.heldRegistrations() : _forMyEvents(),
-        builder: (context, snap) {
-          final w = streamState(snap);
-          if (w != null) return w;
-          final list = snap.data!.where((r) => s.isEventAdmin(r.eventId)).toList();
-          final held = list.where((r) => r.isHeld).toList()
-            ..sort((a, b) {
-              if (a.alreadyPaid != b.alreadyPaid) return a.alreadyPaid ? -1 : 1;
-              return (a.holdEndsAt ?? DateTime(2100)).compareTo(b.holdEndsAt ?? DateTime(2100));
-            });
-          final waitlist = list.where((r) => r.status == 'waitlisted').toList()
-            ..sort((a, b) => (a.createdAt ?? DateTime(2100)).compareTo(b.createdAt ?? DateTime(2100)));
-          return PageBody(children: [
-            const Text(
-              'Tap Mark paid once the payment checks out: you see it arrive in Venmo or Cash App, '
-              'or the family shows you the receipt. Every Mark paid records who tapped it.',
-              style: TextStyle(color: BB.muted),
-            ),
-            const SectionLabel('Waiting on payment'),
-            if (held.isEmpty) const EmptyNote('Nothing waiting. Nice.'),
-            for (final r in held) _HeldCard(r: r),
-            const SectionLabel('Waitlist'),
-            if (waitlist.isEmpty) const EmptyNote('No one on a waitlist.'),
-            for (final r in waitlist)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: GumCard(
-                  edge: BB.grape,
-                  child: Row(children: [
-                    Expanded(
-                      child: Text('${r.playerName} · ${r.divisionName}\n${r.eventName} · ${r.guardianName}',
-                          style: BB.labelStyle(15)),
-                    ),
-                    CandyButton(small: true, label: 'Offer spot', onPressed: () => Repo.instance.offerSpot(r)),
-                  ]),
-                ),
+    return ListenableBuilder(
+      listenable: s,
+      builder: (context, _) {
+        final mine = {
+          for (final a in s.assignments)
+            if (a.role == 'eventAdmin') a.eventId,
+        }.toList()
+          ..sort();
+        return StaffPage(
+          title: 'Payments',
+          children: [
+            LiveData<List<Registration>>(
+              // A new subscription when the role or the showcases change.
+              key: ValueKey('${s.isAdmin}/${mine.join(',')}'),
+              stream: () => s.isAdmin ? Repo.instance.heldRegistrations() : _registrationsAcross(mine),
+              builder: (context, all) => _PaymentsView(
+                regs: all.where((r) => s.isEventAdmin(r.eventId)).toList(),
               ),
-          ]);
-        },
-      ),
+            ),
+          ],
+        );
+      },
     );
   }
+}
 
-  /// Event admins who aren't global admins see their own events' holds.
-  Stream<List<Registration>> _forMyEvents() {
-    final events = Session.instance.assignments.where((a) => a.role == 'eventAdmin').map((a) => a.eventId).toList();
-    if (events.isEmpty) return Stream.value(const []);
-    return Repo.instance.registrationsFor(events.first);
+class _PaymentsView extends StatelessWidget {
+  const _PaymentsView({required this.regs});
+
+  final List<Registration> regs;
+
+  static const _help = [
+    FinePrintItem(
+      'Tap Mark paid when the payment shows up in Venmo or Cash App, or the family shows you the receipt.',
+    ),
+    FinePrintItem('The code is what the family put in the payment note.'),
+    FinePrintItem('Every Mark paid records who tapped it.'),
+    FinePrintItem('Release opens a held spot. Offer spot holds one for 24 hours.'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    // Families who say they paid come first, then the holds ending soonest.
+    final held = regs.where((r) => r.isHeld).toList()
+      ..sort((a, b) {
+        if (a.alreadyPaid != b.alreadyPaid) return a.alreadyPaid ? -1 : 1;
+        return (a.holdEndsAt ?? DateTime(2100)).compareTo(b.holdEndsAt ?? DateTime(2100));
+      });
+    final waitlist = regs.where((r) => r.status == 'waitlisted').toList()
+      ..sort((a, b) => (a.createdAt ?? DateTime(2100)).compareTo(b.createdAt ?? DateTime(2100)));
+    return _stack([
+      const SectionTitle('Waiting'),
+      if (held.isEmpty) const Quiet('Nothing waiting.'),
+      for (final r in held) _HeldCard(r: r),
+      const SizedBox(height: 26),
+      const SectionTitle('Waitlist'),
+      if (waitlist.isEmpty) const Quiet('No one waiting.'),
+      for (final r in waitlist)
+        StaffRow(
+          r.playerName,
+          sub: _joined([r.eventName, r.divisionName, r.guardianName]),
+          sink: false,
+          trailing: BBButton.paper(
+            'Offer spot',
+            small: true,
+            onPressed: () => attempt(context, () => Repo.instance.offerSpot(r)),
+          ),
+        ),
+      const SizedBox(height: 8),
+      const HowThisWorks(_help),
+    ]);
   }
 }
 
 class _HeldCard extends StatelessWidget {
   const _HeldCard({required this.r});
   final Registration r;
-  @override
-  Widget build(BuildContext context) {
-    final app = r.paidVia == 'cashapp' ? 'Cash App' : 'Venmo';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: GumCard(
-        edge: r.alreadyPaid ? BB.coral : r.holdEnded ? BB.tangerine : BB.lemon,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(child: Text(r.playerName, style: BB.title(19))),
-            Text(r.paymentCode, style: BB.title(18, color: BB.lemon)),
-          ]),
-          Text('${r.eventName} · ${r.divisionName}', style: const TextStyle(color: BB.cardMuted)),
-          const SizedBox(height: 6),
-          Text('${fmtPrice(r.amount)} by $app from "${r.payerName}" · ${r.guardianName}',
-              style: BB.labelStyle(15, weight: FontWeight.w500)),
-          Text(
-            r.alreadyPaid
-                ? 'Family says they already paid. Look for this one first.'
-                : r.holdEnded
-                    ? 'Hold ended ${fmtDateTime(r.holdEndsAt)}. Release it to the waitlist if no payment turns up.'
-                    : 'Held ${holdUntil(r.holdEndsAt)}',
-            style: TextStyle(color: r.alreadyPaid || r.holdEnded ? BB.accent : BB.cardMuted, fontSize: 14),
-          ),
-          const SizedBox(height: 10),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            CandyButton(
-              small: true,
-              icon: Icons.check,
-              label: 'Mark paid',
-              face: BB.mint,
-              edge: BB.ink,
-              onPressed: () async {
-                await Repo.instance.markPaid(r);
-                if (context.mounted) toast(context, '${r.playerName} marked paid');
-              },
-            ),
-            CandyButton.secondary(
-              small: true,
-              label: 'Release spot',
-              onPressed: () async {
-                final ok = await showDialog<bool>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: const Text('Release this spot?'),
-                    content: Text("${r.playerName}'s spot opens up for the next family on the waitlist."),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Keep holding')),
-                      TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Release')),
-                    ],
-                  ),
-                );
-                if (ok == true) await Repo.instance.release(r);
-              },
-            ),
-          ]),
-        ]),
-      ),
+
+  Future<void> _release(BuildContext context) async {
+    final ok = await showPrompt(
+      context,
+      title: 'Release this spot?',
+      note: _joined([r.playerName, r.divisionName]),
+      action: 'Release',
+      cancel: 'Keep',
     );
+    if (ok == null || !context.mounted) return;
+    await attempt(context, () => Repo.instance.release(r));
   }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Paper(
+          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: Text(r.playerName, style: BB.lilita(22))),
+                  const SizedBox(width: 10),
+                  // The code is what gets matched against the payment note.
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 3),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: BB.ink, width: 2),
+                    ),
+                    child: Text(r.paymentCode, style: BB.lilita(19, height: 1.1)),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _joined([r.eventName, r.divisionName, r.guardianName]),
+                  style: BB.bodyStyle(14, color: BB.ink2, height: 1.25),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  _joined([
+                    if (r.amount != null) fmtPrice(r.amount),
+                    _payApp(r),
+                    r.payerName,
+                  ]),
+                  style: BB.labelStyle(17, color: BB.ink, height: 1.2),
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (r.alreadyPaid)
+                const Pill('Says paid', color: BB.coral)
+              else if (r.holdEnded)
+                const Pill('Hold ended')
+              else if (r.holdEndsAt != null)
+                Pill('Held ${holdUntil(r.holdEndsAt)}'),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  BBButton.primary(
+                    'Mark paid',
+                    small: true,
+                    icon: const BBIcon(BBGlyph.check),
+                    onPressed: () => attempt(
+                      context,
+                      () => Repo.instance.markPaid(r),
+                      done: '${r.playerName} marked paid',
+                    ),
+                  ),
+                  BBButton.paper('Release', small: true, onPressed: () => _release(context)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 /// Owner only: every Mark paid, who tapped it, and totals by app and week,
-/// to tick off against your Venmo and Cash App history.
+/// to tick off against the Venmo and Cash App history.
 class PaymentCheckScreen extends StatelessWidget {
   const PaymentCheckScreen({super.key});
+
+  static Stream<List<Registration>> _paid() {
+    final repo = Repo.instance;
+    if (repo.demo) {
+      // Sample data has no collection to query, so gather it by showcase.
+      return repo.allEvents().asyncMap((events) async => [
+            for (final e in events)
+              ...(await repo.registrationsFor(e.id).first).where((r) => r.isConfirmed),
+          ]);
+    }
+    return repo.registrations
+        .where('status', whereIn: ['paid', 'checkedIn'])
+        .snapshots()
+        .map((s) => s.docs.map(Registration.fromDoc).toList());
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Payment check')),
-        body: StreamBuilder(
-          stream: Repo.instance.registrations.where('status', whereIn: ['paid', 'checkedIn']).snapshots(),
-          builder: (context, snap) {
-            final w = streamState(snap);
-            if (w != null) return w;
-            final list = snap.data!.docs.map(Registration.fromDoc).toList()
-              ..sort((a, b) => (b.markedPaidAt ?? DateTime(2000)).compareTo(a.markedPaidAt ?? DateTime(2000)));
-            final totals = <String, num>{};
-            for (final r in list) {
-              final d = r.markedPaidAt ?? DateTime(2000);
-              final week = DateFormat('MMM d').format(d.subtract(Duration(days: d.weekday - 1)));
-              final key = '${r.paidVia == 'cashapp' ? 'Cash App' : 'Venmo'} · week of $week';
-              totals[key] = (totals[key] ?? 0) + (r.amount ?? 0);
-            }
-            return PageBody(children: [
-              const SectionLabel('Totals'),
-              if (totals.isEmpty) const EmptyNote('No payments marked yet.'),
-              for (final t in totals.entries)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(t.key, style: BB.labelStyle(16)),
-                  trailing: Text(fmtPrice(t.value), style: BB.title(18)),
-                ),
-              const SectionLabel('Every Mark paid'),
-              for (final r in list)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: GumCard(
-                    edge: BB.mint,
-                    child: Text(
-                      '${r.paymentCode} · ${fmtPrice(r.amount)} · ${r.paidVia == 'cashapp' ? 'Cash App' : 'Venmo'} from "${r.payerName}"\n'
-                      '${r.playerName} · ${r.eventName}\n'
-                      'Marked by ${r.markedPaidByName ?? '?'} ${fmtDateTime(r.markedPaidAt)}',
-                      style: const TextStyle(fontSize: 14.5),
+  Widget build(BuildContext context) => StaffPage(
+        title: 'Payment check',
+        children: [
+          LiveData<List<Registration>>(
+            stream: _paid,
+            builder: (context, regs) => _PaymentCheckView(regs: regs),
+          ),
+        ],
+      );
+}
+
+class _PaymentCheckView extends StatelessWidget {
+  const _PaymentCheckView({required this.regs});
+
+  final List<Registration> regs;
+
+  @override
+  Widget build(BuildContext context) {
+    final list = [...regs]
+      ..sort((a, b) => (b.markedPaidAt ?? DateTime(2000)).compareTo(a.markedPaidAt ?? DateTime(2000)));
+    if (list.isEmpty) return const Quiet('Nothing marked paid yet.');
+    // One total per app per week, newest week first.
+    final totals = <(String, String), num>{};
+    for (final r in list) {
+      final d = r.markedPaidAt ?? DateTime(2000);
+      final week = DateFormat('MMM d').format(d.subtract(Duration(days: d.weekday - 1)));
+      final key = (_payApp(r), week);
+      totals[key] = (totals[key] ?? 0) + (r.amount ?? 0);
+    }
+    return _stack([
+      const SectionTitle('Totals'),
+      RuledPanel(
+        children: [
+          for (final t in totals.entries)
+            RuledRow(name: t.key.$1, sub: 'week of ${t.key.$2}', value: fmtPrice(t.value)),
+        ],
+      ),
+      const SizedBox(height: 30),
+      const SectionTitle('Marked paid'),
+      for (final r in list)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Paper(
+            radius: 14,
+            padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        r.playerName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: BB.labelStyle(19, color: BB.ink, height: 1.1),
+                      ),
                     ),
+                    const SizedBox(width: 10),
+                    if (r.amount != null) Text(fmtPrice(r.amount), style: BB.lilita(21, height: 1)),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: Text(
+                    _joined([r.paymentCode, _payApp(r), r.payerName]),
+                    style: BB.labelStyle(15, color: BB.ink, height: 1.25),
                   ),
                 ),
-            ]);
-          },
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Text(
+                    _joined([r.eventName, r.markedPaidByName, fmtDateTime(r.markedPaidAt)]),
+                    style: BB.bodyStyle(13.5, color: BB.ink2, height: 1.25),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-      );
+    ]);
+  }
 }
 
 /// Owner only: add and remove Battle Baseball admins.
@@ -659,76 +1175,52 @@ class AdminsScreen extends StatelessWidget {
   const AdminsScreen({super.key});
 
   Future<void> _add(BuildContext context) async {
-    final email = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Add a Battle Baseball admin'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Admins run every event: create events, approve hosts, mark payments, and publish results.'),
-          const SizedBox(height: 12),
-          TextField(
-            controller: email,
-            autofocus: true,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Their account email'),
-          ),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Add')),
-        ],
-      ),
+    final u = await _findAccount(context, 'Add an admin');
+    if (u == null || !context.mounted) return;
+    await attempt(
+      context,
+      () => Repo.instance.setAdmin(u),
+      done: '${_person(u.name, u.email)} is an admin',
     );
-    if (ok != true) return;
-    final u = await Repo.instance.userByEmail(email.text);
-    if (!context.mounted) return;
-    if (u == null) {
-      toast(context, 'No account with that email yet. Ask them to sign up in the app first.');
-      return;
-    }
-    await Repo.instance.setAdmin(u);
-    if (context.mounted) toast(context, '${u.name.isEmpty ? u.email : u.name} is now an admin');
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Admins')),
-        body: StreamBuilder(
-          stream: Repo.instance.admins(),
-          builder: (context, snap) {
-            final w = streamState(snap);
-            if (w != null) return w;
-            return PageBody(children: [
-              CandyButton(small: true, icon: Icons.add, label: 'Add admin', onPressed: () => _add(context)),
-              const SizedBox(height: 14),
-              for (final (uid, role, name, email) in snap.data!)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: GumCard(
-                    edge: role == 'owner' ? BB.lemon : BB.coral,
-                    child: Row(children: [
-                      Expanded(
-                        child: Text('${name.isEmpty ? email : name}\n${role == 'owner' ? 'Owner' : 'Battle Baseball admin'}',
-                            style: BB.labelStyle(15)),
-                      ),
+  Widget build(BuildContext context) => StaffPage(
+        title: 'Admins',
+        trailing: BBButton.primary(
+          'Add',
+          small: true,
+          icon: const BBIcon(BBGlyph.plus),
+          onPressed: () => _add(context),
+        ),
+        children: [
+          LiveData<List<(String, String, String, String)>>(
+            stream: () => Repo.instance.admins(),
+            builder: (context, admins) => _stack([
+              for (final (uid, role, name, email) in admins)
+                StaffRow(
+                  _person(name, email),
+                  sub: name.isEmpty ? null : email,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Pill(role == 'owner' ? 'Owner' : 'Admin', color: BB.lemon),
                       if (role != 'owner')
-                        IconButton(
-                          tooltip: 'Remove admin',
-                          icon: const Icon(Icons.remove_circle_outline),
-                          onPressed: () => Repo.instance.removeAdmin(uid),
+                        IconTap(
+                          BBGlyph.close,
+                          label: 'Remove ${_person(name, email)}',
+                          onTap: () => attempt(context, () => Repo.instance.removeAdmin(uid)),
                         ),
-                    ]),
+                    ],
                   ),
                 ),
-            ]);
-          },
-        ),
+            ]),
+          ),
+        ],
       );
 }
 
-/// Owner only: the Venmo and Cash App handles parents pay to. Each change is
-/// logged, since a changed handle would send families' money somewhere else.
+/// Owner only: the Venmo and Cash App handles families pay to.
 class PaymentSettingsScreen extends StatefulWidget {
   const PaymentSettingsScreen({super.key});
   @override
@@ -742,6 +1234,11 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
   bool _loaded = false;
   bool _busy = false;
 
+  static const _help = [
+    FinePrintItem('Families see these when they reserve a spot.'),
+    FinePrintItem('Every change is logged with who made it.'),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -753,6 +1250,9 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
         _payTo.text = p.payTo;
         _loaded = true;
       });
+    }, onError: (Object _) {
+      // Nothing saved yet reads the same as blank fields.
+      if (mounted) setState(() => _loaded = true);
     });
   }
 
@@ -764,58 +1264,54 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
     super.dispose();
   }
 
+  Future<void> _save() async {
+    setState(() => _busy = true);
+    try {
+      await Repo.instance.savePaymentSettings(PaymentSettings(
+        venmo: _venmo.text.trim().replaceAll('@', ''),
+        cashtag: _cash.text.trim().replaceAll('\$', ''),
+        payTo: _payTo.text.trim(),
+      ));
+      if (mounted) toast(context, 'Saved');
+    } catch (_) {
+      if (mounted) toast(context, "Couldn't save. Try again.");
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Payment settings')),
-        body: !Session.instance.isOwner
-            ? const Center(child: Text('Only the owner can change payment settings.'))
-            : !_loaded
-                ? const Center(child: CircularProgressIndicator())
-                : PageBody(children: [
-                    const Text(
-                      'Families see these on every event when they reserve a spot. Every change is '
-                      'logged with who made it.',
-                      style: TextStyle(color: BB.muted),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _payTo,
-                      decoration: const InputDecoration(
-                        labelText: 'Name families see',
-                        helperText: 'e.g. Jared Freeman (Battle Baseball)',
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: Session.instance,
+        builder: (context, _) => StaffPage(
+          title: 'Payment settings',
+          children: !Session.instance.isOwner
+              ? const [Quiet('Owner only.')]
+              : !_loaded
+                  ? const [LoadingField()]
+                  : [
+                      TextField(
+                        controller: _payTo,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(labelText: 'Name families see'),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _venmo,
-                      decoration: const InputDecoration(labelText: 'Venmo handle', prefixText: '@'),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _cash,
-                      decoration: const InputDecoration(labelText: 'Cash App \$cashtag', prefixText: '\$'),
-                    ),
-                    const SizedBox(height: 20),
-                    CandyButton(
-                      expand: true,
-                      busy: _busy,
-                      label: 'Save payment settings',
-                      onPressed: () async {
-                        setState(() => _busy = true);
-                        try {
-                          await Repo.instance.savePaymentSettings(PaymentSettings(
-                            venmo: _venmo.text.trim().replaceAll('@', ''),
-                            cashtag: _cash.text.trim().replaceAll('\$', ''),
-                            payTo: _payTo.text.trim(),
-                          ));
-                          if (context.mounted) toast(context, 'Saved');
-                        } catch (e) {
-                          if (context.mounted) toast(context, "Couldn't save: $e");
-                        } finally {
-                          if (mounted) setState(() => _busy = false);
-                        }
-                      },
-                    ),
-                  ]),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _venmo,
+                        autocorrect: false,
+                        decoration: const InputDecoration(labelText: 'Venmo', prefixText: '@'),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _cash,
+                        autocorrect: false,
+                        decoration: const InputDecoration(labelText: 'Cash App', prefixText: '\$'),
+                      ),
+                      const SizedBox(height: 4),
+                      const HowThisWorks(_help),
+                      const SizedBox(height: 16),
+                      BBButton.primary('Save', expand: true, busy: _busy, onPressed: _save),
+                    ],
+        ),
       );
 }

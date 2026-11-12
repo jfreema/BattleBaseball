@@ -13,10 +13,24 @@ import 'package:flutter/foundation.dart';
 
 class Session extends ChangeNotifier {
   Session._() {
+    if (demoAs != null) {
+      // A pretend sign-in over sample data: nothing is read or written.
+      ready = true;
+      profileChecked = true;
+      hasProfile = true;
+      name = 'Jamie Reed';
+      if (demoAs == 'staff') role = 'owner';
+      return;
+    }
     _authSub = FirebaseAuth.instance.authStateChanges().listen(_onAuth);
   }
 
   static final Session instance = Session._();
+
+  /// Set by main() before the first use of [instance] when the app is opened
+  /// with ?demo=family (a parent with two players) or ?demo=staff (an owner),
+  /// so signed-in screens can be reviewed with sample data.
+  static String? demoAs;
 
   StreamSubscription<User?>? _authSub;
   StreamSubscription<DocumentSnapshot<Json>>? _roleSub;
@@ -36,7 +50,14 @@ class Session extends ChangeNotifier {
   bool profileChecked = false;
   bool hasProfile = false;
 
-  bool get signedIn => user != null;
+  bool get signedIn => user != null || demoAs != null;
+
+  /// The signed-in person's id. Prefer this to `user!.uid`: it also answers
+  /// in the demo sign-in, where [user] is null.
+  String? get uid => user?.uid ?? (demoAs != null ? 'demo-parent' : null);
+  String get email => user?.email ?? (demoAs != null ? 'jamie@example.com' : '');
+  String get firstName => displayName.trim().split(RegExp(r'\s+')).first;
+
   bool get isOwner => role == 'owner';
   bool get isAdmin => role == 'owner' || role == 'admin';
   bool get hasStaffTools => isAdmin || assignments.isNotEmpty;
