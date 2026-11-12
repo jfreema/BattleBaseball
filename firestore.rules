@@ -1,0 +1,192 @@
+rules_version = '2';
+
+// Battle Baseball's Firestore rules.
+//
+// Roles:
+//   owner                roles/{uid}.role == 'owner'. Set by hand in the
+//                        Firebase console; nothing in the app can create it.
+//   Battle Baseball admin roles/{uid}.role == 'admin'. Only the owner adds them.
+//   event admin          staffAssignments/{eventId}_{uid}.role == 'eventAdmin',
+//                        for one event. The owner and BB admins choose them.
+//   event staff          staffAssignments/{eventId}_{uid}.role == 'staff'.
+//                        Any admin of the event adds them.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function doc(path) { return /databases/$(database)/documents/$(path); }
+
+    function roleOf() {
+      return exists(doc('roles/' + me())) ? get(doc('roles/' + me())).data.role : '';
+    }
+    function isOwner() { return signedIn() && roleOf() == 'owner'; }
+    function isAdmin() { return signedIn() && roleOf() in ['owner', 'admin']; }
+
+    function staffDoc(eventId) { return doc('staffAssignments/' + eventId + '_' + me()); }
+    function isEventStaff(eventId) {
+      return isAdmin() || (signedIn() && exists(staffDoc(eventId)));
+    }
+    function isEventAdmin(eventId) {
+      return isAdmin()
+        || (signedIn() && exists(staffDoc(eventId)) && get(staffDoc(eventId)).data.role == 'eventAdmin');
+    }
+
+    function changes() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function onlyChanges(keys) { return changes().hasOnly(keys); }
+
+    // ---------- People ----------
+
+    match /users/{userId} {
+      allow read: if signedIn() && (me() == userId || isAdmin());
+      allow create, update: if signedIn() && me() == userId
+        && request.resource.data.keys().hasOnly(
+             ['name', 'email', 'phone', 'adultConfirmed', 'termsAcceptedAt', 'createdAt']);
+    }
+
+    // Lets an admin add someone by the exact email they signed up with.
+    match /userEmails/{email} {
+      allow get: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.uid == me()
+        && email == request.auth.token.email;
+    }
+
+    match /roles/{userId} {
+      allow get: if signedIn() && (me() == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create, update: if isOwner() && request.resource.data.role == 'admin';
+      allow delete: if isOwner() && resource.data.role != 'owner';
+    }
+
+    // ---------- Payment settings (owner only) ----------
+
+    match /config/payments {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    match /auditLogs/{id} {
+      allow read: if isOwner();
+      allow create: if isAdmin() && request.resource.data.by == me();
+    }
+
+    // ---------- Events ----------
+
+    match /events/{eventId} {
+      allow read: if resource.data.status in ['open', 'closed', 'live', 'final', 'rainedOut']
+        || isEventStaff(eventId);
+      allow create, delete: if isAdmin();
+      allow update: if isEventAdmin(eventId);
+    }
+
+    match /divisions/{id} {
+      allow read: if true;
+      allow create: if isEventAdmin(request.resource.data.eventId);
+      allow delete: if isEventAdmin(resource.data.eventId);
+      // Admins edit anything; a parent's reservation can only take one
+      // spot, for a registration of theirs created in the same write.
+      allow update: if isEventAdmin(resource.data.eventId) || parentTakesSpot(id);
+    }
+
+    function parentTakesSpot(divisionId) {
+      let reg = 'registrations/' + request.resource.data.lastReg;
+      return signedIn()
+        && onlyChanges(['taken', 'lastReg'])
+        && request.resource.data.taken == resource.data.taken + 1
+        && request.resource.data.taken <= resource.data.capacity
+        && (!exists(doc(reg)) || get(doc(reg)).data.status in ['released', 'cancelled'])
+        && existsAfter(doc(reg))
+        && getAfter(doc(reg)).data.guardianUid == me()
+        && getAfter(doc(reg)).data.divisionId == divisionId
+        && getAfter(doc(reg)).data.status == 'held';
+    }
+
+    // ---------- Players ----------
+
+    match /players/{playerId} {
+      allow read: if resource.data.publicProfile == true
+        || (signedIn() && (me() in resource.data.guardianUids || isAdmin()));
+      allow create: if signedIn() && request.resource.data.guardianUids == [me()];
+      allow update: if signedIn() && me() in resource.data.guardianUids
+        && request.resource.data.guardianUids == resource.data.guardianUids;
+      allow delete: if signedIn() && me() in resource.data.guardianUids;
+    }
+
+    match /playerPrivate/{playerId} {
+      allow read: if signedIn() && (me() in resource.data.guardianUids || isAdmin());
+      allow create: if signedIn() && request.resource.data.guardianUids == [me()];
+      allow update: if signedIn() && me() in resource.data.guardianUids
+        && request.resource.data.guardianUids == resource.data.guardianUids;
+      allow delete: if signedIn() && me() in resource.data.guardianUids;
+    }
+
+    // ---------- Registrations ----------
+
+    function validNewRegistration(regId) {
+      let r = request.resource.data;
+      return signedIn()
+        && r.guardianUid == me()
+        && regId == r.eventId + '_' + r.playerId
+        && r.status in ['held', 'waitlisted']
+        && exists(doc('players/' + r.playerId))
+        && me() in get(doc('players/' + r.playerId)).data.guardianUids
+        && get(doc('events/' + r.eventId)).data.status == 'open';
+    }
+
+    match /registrations/{regId} {
+      allow get: if signedIn()
+        && (resource == null || resource.data.guardianUid == me() || isEventStaff(resource.data.eventId));
+      allow list: if signedIn()
+        && (resource.data.guardianUid == me() || isEventStaff(resource.data.eventId));
+      allow create: if validNewRegistration(regId);
+      allow update: if isEventAdmin(resource.data.eventId)
+        // Volunteers check players in and hand out jersey numbers.
+        || (isEventStaff(resource.data.eventId) && onlyChanges(['jersey', 'status'])
+            && (request.resource.data.status == resource.data.status
+                || (resource.data.status == 'paid' && request.resource.data.status == 'checkedIn')))
+        // The family's "I already paid".
+        || (signedIn() && resource.data.guardianUid == me() && onlyChanges(['alreadyPaid'])
+            && request.resource.data.alreadyPaid == true)
+        // Registering again after a released or cancelled spot.
+        || (resource.data.status in ['released', 'cancelled'] && validNewRegistration(regId));
+      allow delete: if isAdmin();
+    }
+
+    match /staffAssignments/{id} {
+      allow read: if signedIn() && (resource.data.uid == me() || isEventAdmin(resource.data.eventId));
+      allow create, update: if id == request.resource.data.eventId + '_' + request.resource.data.uid
+        && (isAdmin() || (isEventAdmin(request.resource.data.eventId) && request.resource.data.role == 'staff'));
+      allow delete: if isAdmin() || (isEventAdmin(resource.data.eventId) && resource.data.role == 'staff');
+    }
+
+    // ---------- Results ----------
+
+    match /measurements/{id} {
+      allow read: if resource.data.published == true || isEventStaff(resource.data.eventId);
+      allow create: if isEventStaff(request.resource.data.eventId) && request.resource.data.recordedBy == me();
+      allow update: if isEventAdmin(resource.data.eventId);
+      allow delete: if isEventStaff(resource.data.eventId);
+    }
+
+    match /awards/{id} {
+      allow read: if resource.data.published == true || isEventStaff(resource.data.eventId);
+      allow create: if isEventStaff(request.resource.data.eventId) && request.resource.data.recordedBy == me();
+      allow update: if isEventAdmin(resource.data.eventId);
+      allow delete: if isEventStaff(resource.data.eventId);
+    }
+
+    // ---------- Website forms ----------
+
+    match /hostInquiries/{id} {
+      allow create: if request.resource.data.keys().hasOnly(
+            ['team', 'city', 'contact', 'email', 'phone', 'message', 'status', 'createdAt'])
+        && request.resource.data.team is string && request.resource.data.team.size() > 0
+        && request.resource.data.team.size() <= 100
+        && request.resource.data.contact is string && request.resource.data.contact.size() <= 80
+        && request.resource.data.email is string && request.resource.data.email.size() <= 120
+        && request.resource.data.message is string && request.resource.data.message.size() <= 2000
+        && request.resource.data.status == 'new';
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}

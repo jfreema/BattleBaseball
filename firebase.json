@@ -1,0 +1,62 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "battlebaseball-prod",
+          "appId": "1:32593350512:android:06c7652c21a3b707c409b5",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "battlebaseball-prod",
+          "configurations": {
+            "android": "1:32593350512:android:06c7652c21a3b707c409b5",
+            "ios": "1:32593350512:ios:19e031a78f088dafc409b5",
+            "web": "1:32593350512:web:5604ebb214e0515dc409b5"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "auth": {
+    "providers": {
+      "emailPassword": true
+    }
+  },
+  "hosting": {
+    "public": "build/hosting",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "redirects": [
+      { "source": "/events", "destination": "/app/events", "type": 302 },
+      { "source": "/events/:id", "destination": "/app/events/:id", "type": 302 },
+      { "source": "/register/:id", "destination": "/app/events/:id/reserve", "type": 302 },
+      { "source": "/leaderboards", "destination": "/app/leaderboards", "type": 302 },
+      { "source": "/battleplan", "destination": "https://getbattleplan.app", "type": 302 }
+    ],
+    "rewrites": [
+      { "source": "/app/**", "destination": "/app/index.html" }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(html|js|json)",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "/app{,/**}",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "**/*.@(woff2|ttf|otf)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
+      }
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Replaced by `flutter build web --base-href /app/`. -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Register players, reserve spots, and follow results for Battle Baseball youth player showcases.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b1531">
+  <meta name="robots" content="noindex">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Battle Baseball">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
+  <title>Battle Baseball</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    html, body { margin: 0; height: 100%; background: #0b1531; }
+    .boot { position: fixed; inset: 0; display: grid; place-items: center; }
+    .boot div { width: 44px; height: 44px; border-radius: 50%; border: 4px solid #35466d; border-top-color: #f45b5b; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="boot" aria-label="Loading"><div></div></div>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

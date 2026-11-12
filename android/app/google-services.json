@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "32593350512",
+    "project_id": "battlebaseball-prod",
+    "storage_bucket": "battlebaseball-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:32593350512:android:06c7652c21a3b707c409b5",
+        "android_client_info": {
+          "package_name": "app.getbattleplan.battle_baseball"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDy1KMh677YSafUJ7Zce9ze8MAaORzvY1o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

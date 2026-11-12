@@ -1,0 +1,743 @@
+/* Battle Baseball website. Plain CSS, no build step.
+   Started from BattlePlan's website/site.css so the two sites read as
+   siblings: the Open Field look (Lilita One titles on a hard drop, stencil
+   eyebrows, outlined cards on a lip with a candy edge, coral candy buttons),
+   in the Navy scheme with red lips, baseball's navy and red. Fonts are
+   bundled in fonts/ (SIL OFL), so the site makes no third-party font
+   requests. Battle Baseball's own pieces are at the end of the file. */
+
+@font-face {
+  font-family: "Lilita One";
+  src: url("/fonts/lilita-one.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Black Ops One";
+  src: url("/fonts/black-ops-one.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fredoka";
+  src: url("/fonts/fredoka.woff2") format("woff2");
+  font-weight: 500 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Nunito";
+  src: url("/fonts/nunito.woff2") format("woff2");
+  font-weight: 400 900;
+  font-display: swap;
+}
+
+/* ---------- Color roles (Open Field, Appendix A of its spec) ----------
+   page / band: the page and the alternate section band (the app's tab bar).
+   text / muted: on the page and the band. card-*: on cards.
+   accent / going / maybe / game: colored text on the page (4.5:1 or more).
+   c-*: the same on cards. coral, mint, ...: candy faces, with ink on them. */
+:root {
+  color-scheme: dark;
+  /* Navy, Battle Baseball's default. */
+  --page: #0b1531;
+  --band: #07102a;
+  --text: #f2f6ff;
+  --muted: #b2bfe0;
+  --hairline: rgba(242, 246, 255, 0.12);
+  --outline: rgba(242, 246, 255, 0.3);
+  --field: #07102a;
+  --card: #18284c;
+  --rim: #35466d;
+  --card-muted: #c2cce8;
+  --drop: #2a63c9;
+  --accent: #f78c8c;
+  --mark: #f45b5b;
+  --going: #79cd8f;
+  --maybe: #f8d84a;
+  --game: #f19a5a;
+  --c-going: #79cd8f;
+  --c-accent: #f78c8c;
+  --c-game: #f19a5a;
+  --c-practice: #b796f7;
+  --c-other: #f184be;
+  --ink: #050c1f;
+  --lip: #c0262f;
+  --ring: transparent;
+
+  /* Candy faces: the same in every scheme. */
+  --coral: #f45b5b;
+  --mint: #58c173;
+  --lemon: #f8d84a;
+  --tangerine: #ee8131;
+  --grape: #a57cf5;
+  --gum: #eb50a2;
+  --blue: #79bbff;
+
+  --max: 1160px;
+  --gutter: 20px;
+  --display: "Lilita One", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --stencil: "Black Ops One", "Lilita One", system-ui, sans-serif;
+  --label: "Fredoka", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --body: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* The scheme picker (landing page) re-colors the page. */
+:root:has(#s-light:checked) {
+  color-scheme: light;
+  --page: #fbf5e6; --band: #ffffff; --text: #1a1a18; --muted: #5f5a4d;
+  --hairline: rgba(26, 26, 24, 0.12); --outline: rgba(26, 26, 24, 0.3); --field: #efe6cc;
+  --card: #ffffff; --rim: #1a1a18; --card-muted: #5f5a4d; --drop: transparent;
+  --accent: #c0262f; --mark: #c0262f; --going: #137236; --maybe: #8f6500; --game: #9e4b0a;
+  --c-going: #137236; --c-accent: #c0262f; --c-game: #9e4b0a; --c-practice: #6c46cc; --c-other: #ae2770;
+  --ink: #1a1a18; --lip: #1a1a18; --ring: transparent;
+}
+:root:has(#s-dark:checked) {
+  color-scheme: dark;
+  --page: #0e0e0d; --band: #161615; --text: #f4ead0; --muted: rgba(244, 234, 208, 0.75);
+  --hairline: rgba(244, 234, 208, 0.12); --outline: rgba(244, 234, 208, 0.3); --field: #1f1f1c;
+  --card: #1b1b19; --rim: #363631; --card-muted: rgba(244, 234, 208, 0.78); --drop: transparent;
+  --accent: #f76f6f; --mark: #f45b5b; --going: #58c173; --maybe: #f8d84a; --game: #ee8131;
+  --c-going: #58c173; --c-accent: #f76f6f; --c-game: #ee8131; --c-practice: #a57cf5; --c-other: #f06aaf;
+  --ink: #1a1a18; --lip: #c0262f; --ring: transparent;
+}
+:root:has(#s-navy:checked) {
+  color-scheme: dark;
+  --page: #0b1531; --band: #07102a; --text: #f2f6ff; --muted: #b2bfe0;
+  --hairline: rgba(242, 246, 255, 0.12); --outline: rgba(242, 246, 255, 0.3); --field: #07102a;
+  --card: #18284c; --rim: #35466d; --card-muted: #c2cce8; --drop: #2a63c9;
+  --accent: #f78c8c; --mark: #f45b5b; --going: #79cd8f; --maybe: #f8d84a; --game: #f19a5a;
+  --c-going: #79cd8f; --c-accent: #f78c8c; --c-game: #f19a5a; --c-practice: #b796f7; --c-other: #f184be;
+  --ink: #050c1f; --lip: #c0262f; --ring: transparent;
+}
+:root:has(#s-skyblue:checked) {
+  color-scheme: light;
+  --page: #bcd9f5; --band: #ffffff; --text: #0b1531; --muted: #34476e;
+  --hairline: rgba(11, 21, 49, 0.14); --outline: rgba(11, 21, 49, 0.35); --field: #e3eefa;
+  --card: #ffffff; --rim: #0b1531; --card-muted: #34476e; --drop: #ffffff;
+  --accent: #ab222a; --mark: #ab222a; --going: #116530; --maybe: #785200; --game: #8d4309;
+  --c-going: #137236; --c-accent: #c0262f; --c-game: #9e4b0a; --c-practice: #6c46cc; --c-other: #ae2770;
+  --ink: #0b1531; --lip: #0b1531; --ring: #0b1531;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font: 600 17px/1.55 var(--body);
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+img { max-width: 100%; height: auto; display: block; }
+strong { font-weight: 800; }
+[id] { scroll-margin-top: 84px; }
+
+a { color: inherit; text-decoration-thickness: 1.5px; text-underline-offset: 0.18em; }
+a:hover { text-decoration-thickness: 2.5px; }
+
+:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; border-radius: 8px; }
+
+/* Titles: Lilita One on a hard drop (the scheme's title-drop). */
+h1, h2, h3 { margin: 0 0 0.45em; font-weight: 400; color: var(--text); }
+h1, h2 { font-family: var(--display); line-height: 1.04; letter-spacing: 0.005em; }
+h1 { font-size: clamp(2.6rem, 9vw, 4.6rem); text-shadow: 0 4px 0 var(--drop); }
+h2 { font-size: clamp(2rem, 6vw, 3.2rem); text-shadow: 0 3px 0 var(--drop); }
+h3 { font: 1.5rem/1.1 var(--display); text-shadow: 0 2px 0 var(--drop); }
+p, ul, ol { margin: 0 0 1em; }
+
+/* The stencil eyebrow over a title, as in the app's header. */
+.eyebrow {
+  display: block; margin: 0 0 12px;
+  font: 0.9rem/1.3 var(--stencil); letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--accent);
+}
+/* The landing page's eyebrow sits inside its <h1>, so the heading carries the
+   search words; it looks the same as one above it. */
+h1 .eyebrow { text-shadow: none; text-wrap: wrap; }
+
+.skip {
+  position: absolute; left: 16px; top: -100px; z-index: 20;
+  background: var(--coral); color: var(--ink); font: 600 1rem var(--label);
+  padding: 10px 16px; border: 2px solid var(--lip); border-radius: 12px; box-shadow: 0 3px 0 var(--lip);
+}
+.skip:focus { top: calc(12px + env(safe-area-inset-top)); }
+
+.wrap {
+  width: 100%; max-width: var(--max); margin: 0 auto;
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
+}
+.narrow { max-width: 780px; }
+
+.visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---------- Header ---------- */
+.site-header {
+  position: sticky; top: 0; z-index: 10;
+  padding-top: env(safe-area-inset-top);
+  background: var(--page);
+  background: color-mix(in srgb, var(--page) 92%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--hairline);
+}
+.site-header .wrap { display: flex; align-items: center; gap: 10px; min-height: 64px; }
+.brand {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 44px;
+  color: var(--text); text-decoration: none;
+  font: 1.55rem/1 var(--display); text-shadow: 0 2px 0 var(--drop);
+}
+.brand img { width: 34px; height: 34px; border-radius: 10px; box-shadow: 0 0 0 2px var(--rim), 0 3px 0 2px var(--rim); }
+.site-nav { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+.site-nav a:not(.btn) {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 22px;
+  color: var(--text); text-decoration: none; font: 600 1.02rem var(--label);
+}
+.site-nav a:not(.btn):hover { background: var(--hairline); }
+.site-nav a[aria-current="page"] { text-decoration: underline 3px var(--mark); text-underline-offset: 0.35em; }
+.site-nav .btn { margin-left: 6px; }
+@media (max-width: 600px) {
+  .site-nav a.hide-sm { display: none; }
+  .brand { font-size: 1.35rem; }
+}
+@media (max-width: 400px) {
+  .site-nav a.hide-xs { display: none; }
+}
+
+/* ---------- Candy buttons: a pill with a border and a hard lip ---------- */
+.btn {
+  --face: var(--coral); --fg: var(--ink); --edge: var(--lip); --lip-h: 4px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 0 24px; margin-bottom: var(--lip-h);
+  border: 2px solid var(--edge); border-radius: 999px;
+  background: var(--face); color: var(--fg);
+  font: 600 1.08rem/1 var(--label); text-decoration: none; white-space: nowrap; cursor: pointer;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3), 0 var(--lip-h) 0 var(--edge);
+  transition: transform 0.1s, box-shadow 0.1s, filter 0.15s;
+}
+.btn:hover { filter: brightness(1.06); text-decoration: none; }
+.btn:active { transform: translateY(var(--lip-h)); box-shadow: none; }
+.btn-secondary { --face: var(--card); --fg: var(--text); --edge: var(--rim); box-shadow: 0 var(--lip-h) 0 var(--edge); }
+.btn-sm { --lip-h: 3px; min-height: 44px; padding: 0 18px; font-size: 1rem; }
+.btn-lg { min-height: 56px; padding: 0 30px; font-size: 1.2rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 28px; }
+
+/* Store badges (ROADMAP tasks 179, 214, 353), as Apple's guidelines ask:
+   the official artwork unchanged, at least 40 px tall, a quarter of its
+   height clear all round (12 px at 48), and the App Store badge first.
+   Google Play's waits in a <template> for its listing. */
+.store-badges { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0 12px; }
+.store-badges img { height: 48px; width: auto; }
+/* The Android tester badge: Apple's badge's black, rim, and size, our own words. */
+.tester-badge { display: inline-flex; align-items: center; gap: 8px; height: 48px; box-sizing: border-box; padding: 0 14px 0 10px; border: 1px solid #a6a6a6; border-radius: 8px; background: #000; color: #fff; text-decoration: none; font-weight: 700; font-size: 17px; line-height: 1.05; }
+.tester-badge span { display: flex; flex-direction: column; }
+.tester-badge small { font-size: 11px; font-weight: 600; letter-spacing: 0.01em; }
+.tester-badge:hover, .tester-badge:focus-visible { background: #1a1a1a; color: #fff; }
+.hero-copy .store-badges { justify-content: center; }
+
+/* ---------- Phones ---------- */
+.phone {
+  position: relative; flex: none;
+  width: min(260px, 70vw);
+  padding: 8px; border-radius: 34px;
+  background: #0d0e11;
+  box-shadow: 0 0 0 2px var(--rim), 0 22px 44px rgba(0, 0, 0, 0.32);
+}
+.phone img { width: 100%; border-radius: 27px; }
+/* The scheme a screenshot is in: a chip in that scheme's own colors. */
+.tag {
+  position: absolute; left: 50%; bottom: -14px; transform: translateX(-50%);
+  padding: 4px 12px; border-radius: 999px; white-space: nowrap;
+  font: 600 0.85rem/1.2 var(--label); letter-spacing: 0.04em;
+  border: 2px solid #1a1a18; box-shadow: 0 2px 0 #1a1a18;
+}
+.tag[data-s="army"] { background: #474c2b; color: #f4ead0; }
+.tag[data-s="light"] { background: #fbf5e6; color: #1a1a18; }
+.tag[data-s="dark"] { background: #0e0e0d; color: #f4ead0; border-color: #6b6b62; box-shadow: 0 2px 0 #6b6b62; }
+.tag[data-s="navy"] { background: #0b1531; color: #f2f6ff; border-color: #35466d; box-shadow: 0 2px 0 #35466d; }
+.tag[data-s="skyblue"] { background: #bcd9f5; color: #0b1531; border-color: #0b1531; box-shadow: 0 2px 0 #0b1531; }
+
+/* ---------- Hero ---------- */
+.hero { padding: 44px 0 56px; overflow: hidden; }
+.hero-grid { display: grid; gap: 36px; align-items: center; }
+.hero-copy { text-align: center; }
+.hero-copy .lead { margin-left: auto; margin-right: auto; }
+.hero-copy .actions { justify-content: center; }
+.lead { font-size: clamp(1.12rem, 3.6vw, 1.32rem); line-height: 1.45; color: var(--muted); max-width: 32em; }
+.switch-note { margin: 10px 0 0; color: var(--muted); font-size: 1rem; }
+.switch-note a { color: var(--text); font-weight: 800; white-space: nowrap; }
+/* Even lines, so no word sits alone on the last one (browsers without it ignore it). */
+h1, .hero-copy .lead, .section-head p { text-wrap: balance; }
+
+/* The fan of five phones from the Facebook cover: the coach's whiteboard in
+   front (Army green), Thunder's schedule (Navy) and Cyclone's team chat (Light
+   blue) beside it, and Saturday Run Club's chat (Light) and Rally Possums'
+   poll (Dark) at the ends. Every length (phones, padding, corners, offsets)
+   is a share of the stage's width, so the fan keeps the cover's shape at any
+   size and only the stage's width, --fan, changes per screen. Real
+   screenshots rather than one picture, so it's sharp at every pixel density
+   and reuses the page's own images. */
+.hero-media { min-width: 0; }
+.stage {
+  --fan: min(100% + 24px, 720px);
+  position: relative; isolation: isolate;
+  width: var(--fan); margin: 0 0 4px calc(50% - var(--fan) / 2);
+  aspect-ratio: 814 / 610;
+}
+.stage .phone {
+  --d: 0; --a: 0;
+  position: absolute; top: 0; left: 50%;
+  width: 34.14%; padding: 0.98%; border-radius: 12.95% / 6.18%;
+  z-index: calc(10 - var(--a));
+  transform:
+    translateX(-50%) translateX(calc(var(--d) * 43.88%)) translateY(calc(var(--a) * 4.46%))
+    rotate(calc(var(--d) * 6deg)) scale(calc(1 - var(--a) * 0.085));
+  transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.stage .phone img { border-radius: 11.07% / 5.12%; }
+/* The picked scheme's phone comes to the front and the others turn around it
+   like a ring, in the cover's order going right: Army green, Light blue,
+   Dark, Light, Navy. Army green, the default, is the cover itself. The radios
+   are in the picker's fieldset, after the fan, so :has() on .hero-media
+   reaches it; a browser without :has() keeps the cover. */
+.stage .p-skyblue { --d: 1; --a: 1; }
+.stage .p-dark { --d: 2; --a: 2; }
+.stage .p-light { --d: -2; --a: 2; }
+.stage .p-navy { --d: -1; --a: 1; }
+.hero-media:has(#s-light:checked) .p-light, .hero-media:has(#s-dark:checked) .p-dark,
+.hero-media:has(#s-navy:checked) .p-navy, .hero-media:has(#s-skyblue:checked) .p-skyblue { --d: 0; --a: 0; }
+.hero-media:has(#s-light:checked) .p-navy, .hero-media:has(#s-dark:checked) .p-light,
+.hero-media:has(#s-navy:checked) .p-army, .hero-media:has(#s-skyblue:checked) .p-dark { --d: 1; --a: 1; }
+.hero-media:has(#s-light:checked) .p-army, .hero-media:has(#s-dark:checked) .p-navy,
+.hero-media:has(#s-navy:checked) .p-skyblue, .hero-media:has(#s-skyblue:checked) .p-light { --d: 2; --a: 2; }
+.hero-media:has(#s-light:checked) .p-skyblue, .hero-media:has(#s-dark:checked) .p-army,
+.hero-media:has(#s-navy:checked) .p-dark, .hero-media:has(#s-skyblue:checked) .p-navy { --d: -2; --a: 2; }
+.hero-media:has(#s-light:checked) .p-dark, .hero-media:has(#s-dark:checked) .p-skyblue,
+.hero-media:has(#s-navy:checked) .p-light, .hero-media:has(#s-skyblue:checked) .p-army { --d: -1; --a: 1; }
+/* Phones: a little wider than the screen, so the outer phones' far edges
+   are just off it and the front phone is as big as it can be. */
+@media (max-width: 599px) {
+  .stage { --fan: 108vw; }
+}
+
+/* The scheme picker: five radio buttons (visually hidden) and a chip for
+   each scheme. */
+.schemes { border: 0; margin: 0; padding: 0; min-width: 0; }
+.scheme-input {
+  /* Fixed, so focusing a radio when its chip is tapped never scrolls the page.
+     Keep transform, filter, and contain off the fieldset's ancestors, which
+     would pin the inputs to them instead. */
+  position: fixed; top: 50%; left: 50%; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none;
+}
+
+.swatches { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; }
+.swatches label {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 6px 13px 6px 7px;
+  border-radius: 999px; cursor: pointer; user-select: none;
+  background: var(--card); color: var(--text); border: 2px solid var(--rim);
+  font: 600 0.95rem/1 var(--label);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.swatches label:hover { transform: translateY(-2px); }
+/* A dot in the scheme's page color, with its card and coral inside. */
+.swatches .dot {
+  width: 26px; height: 26px; border-radius: 50%; flex: none; position: relative;
+  background: var(--sw-page); box-shadow: inset 0 0 0 2px var(--sw-text);
+}
+.swatches .dot::after {
+  content: ""; position: absolute; inset: 7px; border-radius: 50%;
+  background: var(--coral); box-shadow: 0 0 0 2px var(--sw-card);
+}
+label[for="s-army"] { --sw-page: #474c2b; --sw-card: #575a3a; --sw-text: #f4ead0; }
+label[for="s-light"] { --sw-page: #fbf5e6; --sw-card: #ffffff; --sw-text: #1a1a18; }
+label[for="s-dark"] { --sw-page: #0e0e0d; --sw-card: #1b1b19; --sw-text: #f4ead0; }
+label[for="s-navy"] { --sw-page: #0b1531; --sw-card: #18284c; --sw-text: #f2f6ff; }
+label[for="s-skyblue"] { --sw-page: #bcd9f5; --sw-card: #ffffff; --sw-text: #0b1531; }
+#s-army:checked ~ .swatches label[for="s-army"], #s-light:checked ~ .swatches label[for="s-light"],
+#s-dark:checked ~ .swatches label[for="s-dark"], #s-navy:checked ~ .swatches label[for="s-navy"],
+#s-skyblue:checked ~ .swatches label[for="s-skyblue"] {
+  background: var(--coral); color: var(--ink); border-color: var(--lip); box-shadow: 0 3px 0 var(--lip);
+}
+#s-army:focus-visible ~ .swatches label[for="s-army"], #s-light:focus-visible ~ .swatches label[for="s-light"],
+#s-dark:focus-visible ~ .swatches label[for="s-dark"], #s-navy:focus-visible ~ .swatches label[for="s-navy"],
+#s-skyblue:focus-visible ~ .swatches label[for="s-skyblue"] { outline: 3px solid var(--text); outline-offset: 3px; }
+.schemes-note { margin: 14px 0 0; text-align: center; color: var(--muted); font-size: 0.98rem; text-wrap: balance; }
+
+@media (min-width: 1024px) {
+  .hero { padding: 64px 0 80px; }
+  .hero-grid { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 24px; }
+  .hero-copy { text-align: left; }
+  .hero-copy .lead { margin-left: 0; }
+  .hero-copy .actions, .hero-copy .store-badges { justify-content: flex-start; }
+  /* The fan reaches past the column into the page's right margin, up to
+     140 px and never closer than 12 px to the screen's edge. */
+  .hero-media { margin-right: calc(-1 * min(8px + max(0px, 50vw - 580px), 140px)); }
+  .stage { --fan: 100%; }
+}
+
+/* ---------- Sections ---------- */
+section { padding: 64px 0; }
+.band { background: var(--band); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+.section-head { max-width: 720px; margin-bottom: 36px; }
+.section-head p { color: var(--muted); font-size: 1.15rem; margin: 0; }
+.center { text-align: center; margin-left: auto; margin-right: auto; }
+@media (min-width: 900px) { section { padding: 96px 0; } }
+
+/* Feature tiles: the app's event cards (a rim, a lip, a candy edge), with the
+   phone rising out of the bottom. */
+.tiles { list-style: none; padding: 0; margin: 0; display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); }
+.tile {
+  --edge: var(--coral);
+  position: relative; overflow: hidden; display: flex; flex-direction: column;
+  background: var(--card); color: var(--text);
+  border: 2px solid var(--rim); border-radius: 22px; box-shadow: 0 4px 0 var(--rim);
+  padding: 22px 22px 0 27px;
+}
+.tile::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 6px; background: var(--edge); }
+.tile h3 { margin-bottom: 6px; }
+.tile p { color: var(--card-muted); margin: 0 0 20px; }
+.tile .shot { margin-top: auto; height: 318px; padding-top: 18px; overflow: hidden; display: flex; justify-content: center; }
+.tile .phone { width: min(230px, calc(100% - 40px)); border-radius: 32px 32px 0 0; padding-bottom: 0; align-self: flex-start; }
+.tile .phone img { border-radius: 25px 25px 0 0; }
+.tile .tag { bottom: auto; top: -14px; left: auto; right: -18px; transform: rotate(4deg); }
+.tiles li:nth-child(2) { --edge: var(--tangerine); }
+.tiles li:nth-child(3) { --edge: var(--grape); }
+.tiles li:nth-child(4) { --edge: var(--gum); }
+.tiles li:nth-child(5) { --edge: var(--mint); }
+.tiles li:nth-child(6) { --edge: var(--lemon); }
+/* The last tile: no phone, a list of chips. */
+.tile.more { padding-bottom: 24px; }
+.chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.chips li {
+  padding: 6px 13px; border-radius: 999px; border: 1.5px solid var(--outline);
+  font: 600 0.98rem/1.25 var(--label); color: var(--text);
+}
+.tile .chips li { border-color: var(--rim); background: var(--page); }
+
+/* Spotlights: a title, a line, chips, and the phones. */
+.spot-section { overflow: hidden; }
+.spot { display: grid; gap: 40px; align-items: center; }
+.spot-copy p { color: var(--muted); font-size: 1.15rem; max-width: 30em; }
+.spot-copy .chips { margin-top: 22px; }
+.spot-media { position: relative; isolation: isolate; display: flex; justify-content: center; align-items: flex-start; padding: 12px 0 24px; }
+/* A big candy disc behind the phones. */
+.spot-media::before {
+  content: ""; position: absolute; z-index: 0; left: 50%; top: 50%;
+  width: min(600px, 104vw); aspect-ratio: 1; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--disc, var(--coral)); border: 2px solid var(--rim); box-shadow: 0 6px 0 var(--rim);
+}
+#players .spot-media { --disc: var(--mint); }
+#whiteboard .spot-media { --disc: var(--grape); }
+.spot-media .phone { z-index: 1; }
+.spot-media.pair .phone { width: min(230px, 44vw); }
+.spot-media.pair .phone:first-child { transform: rotate(-4deg); z-index: 2; }
+.spot-media.pair .phone:last-child { transform: rotate(4deg) translateY(36px); margin-left: -28px; }
+.new {
+  display: inline-block; vertical-align: 0.55em; margin-left: 8px; padding: 3px 9px 2px;
+  font: 0.8rem/1.2 var(--stencil); letter-spacing: 0.12em; text-shadow: none;
+  background: var(--lemon); color: #1a1a18; border: 2px solid #1a1a18; border-radius: 8px;
+  transform: rotate(-4deg);
+}
+@media (min-width: 900px) {
+  .spot { grid-template-columns: 1fr 1fr; gap: 64px; }
+  .spot-media > .phone:only-child { width: 290px; }
+  .spot-media.pair .phone { width: 250px; }
+  .spot.flip .spot-media { order: -1; }
+  /* The disc spreads into half the gap at most, never over the copy beside it. */
+  .spot-media::before { width: min(600px, calc(100% + 64px)); }
+}
+
+/* Switching: a row of apps, each in a neutral badge (never their logos). */
+.app-badge {
+  flex: none; width: 40px; height: 40px; border-radius: 12px; display: inline-grid; place-items: center;
+  background: var(--coral); color: #1a1a18; border: 2px solid #1a1a18; box-shadow: 0 3px 0 #1a1a18;
+  font: 1.25rem/1 var(--display); text-shadow: none;
+}
+.apps { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+.apps a {
+  display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px;
+  background: var(--card); color: var(--text); text-decoration: none;
+  border: 2px solid var(--rim); border-radius: 18px; box-shadow: 0 4px 0 var(--rim);
+  font: 600 1.1rem/1.2 var(--label);
+  transition: transform 0.12s;
+}
+.apps a:hover { transform: translateY(-2px); }
+.apps li:nth-child(2) .app-badge, .app-jump li:nth-child(2) .app-badge, #teamsnap .app-badge { background: var(--tangerine); }
+.apps li:nth-child(3) .app-badge, .app-jump li:nth-child(3) .app-badge, #teamreach .app-badge { background: var(--grape); }
+.apps li:nth-child(4) .app-badge, .app-jump li:nth-child(4) .app-badge, #gamechanger .app-badge { background: var(--mint); }
+.apps li:nth-child(5) .app-badge, .app-jump li:nth-child(5) .app-badge, #google-calendar .app-badge { background: var(--lemon); }
+.more-link { margin: 26px 0 0; font: 600 1.1rem var(--label); }
+.more-link a { color: var(--text); text-decoration-color: var(--mark); text-decoration-thickness: 3px; }
+.fineprint { margin: 20px 0 0; color: var(--muted); font-size: 0.875rem; }
+
+/* Free: a scoreboard, the big numbers in the app's count colors. */
+.score { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px 28px; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+.score li { padding: 20px 4px 18px; border-top: 3px solid var(--hairline); }
+.score b { display: block; font: 400 clamp(2.8rem, 8vw, 3.6rem)/1 var(--display); color: var(--going); text-shadow: 0 3px 0 var(--drop); }
+.score li:nth-child(2) b { color: var(--accent); }
+.score li:nth-child(3) b { color: var(--maybe); }
+.score span { display: block; margin-top: 8px; color: var(--muted); font-size: 1.08rem; }
+
+/* FAQ */
+.faq { display: grid; gap: 12px; }
+.faq details {
+  background: var(--card); color: var(--text);
+  border: 2px solid var(--rim); border-radius: 18px; box-shadow: 0 4px 0 var(--rim); padding: 0 20px;
+}
+.faq summary {
+  cursor: pointer; position: relative; list-style: none;
+  padding: 18px 48px 18px 0; font: 600 1.15rem/1.3 var(--label);
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: "+"; position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--coral); color: var(--ink); border: 2px solid var(--lip); box-shadow: 0 3px 0 var(--lip);
+  font: 600 1.35rem/1 var(--label);
+}
+.faq details[open] > summary::after { content: "\2212"; }
+.faq details > p { color: var(--card-muted); margin: 0; padding: 0 0 18px; }
+
+/* Closing call to action: a big coral slab. */
+.cta {
+  position: relative; overflow: hidden; text-align: center;
+  background: var(--coral); color: #1a1a18;
+  border: 2px solid var(--lip); border-radius: 30px; box-shadow: 0 6px 0 var(--lip);
+  padding: 52px 24px 46px;
+}
+.cta h2 { color: #1a1a18; text-shadow: 0 3px 0 rgba(255, 255, 255, 0.35); }
+.cta p { font-size: 1.2rem; font-weight: 800; margin: 0; }
+.cta .actions { justify-content: center; }
+.cta .btn { --face: #fff9ec; --fg: #1a1a18; --edge: #1a1a18; }
+.cta .eyebrow { color: #1a1a18; }
+.cta :focus-visible { outline-color: #1a1a18; }
+
+.project-support { text-align: center; padding-top: 8px; padding-bottom: 56px; }
+.project-support p { color: var(--muted); font-size: 0.95rem; margin: 12px 0 0; }
+
+/* ---------- Text pages (support, switch, legal, 404) ---------- */
+.page { padding: 48px 0 72px; }
+.page h1 { font-size: clamp(2.3rem, 7vw, 3.4rem); }
+.page h2 { font-size: clamp(1.55rem, 4.5vw, 2rem); margin-top: 1.6em; text-shadow: 0 2px 0 var(--drop); }
+.page h3 { font: 600 1.25rem/1.25 var(--label); text-shadow: none; margin-top: 1.4em; }
+.page .lead { margin-bottom: 1.5em; }
+.page li { margin-bottom: 0.4em; }
+.page a { text-decoration-color: var(--mark); }
+.note, .toc {
+  background: var(--card); color: var(--text);
+  border: 2px solid var(--rim); border-radius: 18px; box-shadow: 0 4px 0 var(--rim);
+}
+.note { position: relative; overflow: hidden; padding: 16px 20px 16px 26px; margin: 0 0 28px; }
+.note::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 6px; background: var(--coral); }
+.note p:last-child { margin-bottom: 0; }
+.toc { padding: 18px 22px 8px; margin-bottom: 28px; }
+.toc h2 { font-size: 1.35rem; margin: 0 0 8px; }
+.steps { padding-left: 1.4em; }
+.steps li { padding-left: 4px; }
+.steps li::marker { font-family: var(--label); font-weight: 600; color: var(--accent); }
+.email { font: 600 1.15rem var(--label); }
+.placeholder { color: var(--muted); font-style: italic; }
+kbd, .ui {
+  font: 600 0.95em var(--label); color: var(--text); background: var(--field);
+  box-shadow: inset 0 0 0 1.5px var(--outline);
+  padding: 1px 8px; border-radius: 8px; white-space: nowrap;
+}
+.app-jump { list-style: none; padding: 0; margin: 4px 0 10px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.app-jump a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font: 600 1rem var(--label); }
+.app-jump .app-badge { width: 30px; height: 30px; border-radius: 9px; font-size: 1rem; }
+.switch-app { padding: 8px 0 12px; }
+/* The app's badge sits beside its heading, outside it, so the heading reads
+   "From GroupMe" to search engines, not "GFrom GroupMe". */
+.switch-head { display: flex; align-items: center; gap: 14px; margin: 1.6em 0 0.45em; }
+.page .switch-head h2 { margin: 0; }
+.switch-app .lead { margin-bottom: 0.6em; }
+.page .cta { margin-top: 48px; }
+.page .cta h2 { margin-top: 0; font-size: clamp(1.8rem, 5.5vw, 2.6rem); }
+.popular h2 { margin-bottom: 14px; }
+
+/* ---------- Feature pages (team chat, schedule, dues, the whiteboard,
+   groups, and the two alternatives): a hero with a phone, spotlights, cards,
+   the FAQ, links to the other pages, and the closing call to action. ---------- */
+.feature-hero { padding: 24px 0 56px; }
+.feature-hero h1 { font-size: clamp(2.4rem, 8vw, 3.9rem); }
+.feature-hero .actions { margin-top: 22px; }
+@media (min-width: 900px) { .feature-hero { padding: 40px 0 80px; } }
+/* Breadcrumbs: Home / this page, matching the BreadcrumbList in the JSON-LD. */
+.crumbs ol {
+  list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; align-items: center;
+  font: 600 0.95rem/1.3 var(--label); color: var(--muted);
+}
+.crumbs li + li::before { content: "/"; content: "/" / ""; margin: 0 10px; color: var(--muted); }
+.crumbs a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; color: var(--text); text-decoration-color: var(--mark); }
+.spot-copy p a, .section-head p a, .points a { text-decoration-color: var(--mark); }
+.spot-copy .more-link { font-size: 1.1rem; }
+/* The candy disc behind a spotlight's phones. */
+.disc-mint { --disc: var(--mint); }
+.disc-grape { --disc: var(--grape); }
+.disc-lemon { --disc: var(--lemon); }
+.disc-tangerine { --disc: var(--tangerine); }
+.disc-blue { --disc: var(--blue); }
+.disc-gum { --disc: var(--gum); }
+/* Cards: the feature tiles without a phone. */
+/* Four columns for four cards on a wide screen, two on a tablet; six go three by two. */
+.points { grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); }
+.points:has(> li:nth-child(5)) { grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+.points .tile { padding-bottom: 22px; }
+.nw { white-space: nowrap; }
+.points .tile p { margin: 0; }
+.points .tile p + p { margin-top: 8px; }
+.points-after { margin: 28px 0 0; color: var(--muted); max-width: 46em; }
+.steps-wrap { max-width: 720px; }
+/* Two short sections side by side from 900 px, each with its own heading. */
+.duo { display: grid; gap: 56px; }
+.duo .spot-copy p { max-width: none; }
+@media (min-width: 900px) { .duo { grid-template-columns: 1fr 1fr; gap: 64px; } }
+.steps-wrap .steps li { margin-bottom: 0.5em; }
+/* Links to the other pages: cards with a title and one line. */
+.related { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+.related a {
+  display: block; height: 100%; padding: 16px 18px 18px;
+  background: var(--card); color: var(--text); text-decoration: none;
+  border: 2px solid var(--rim); border-radius: 18px; box-shadow: 0 4px 0 var(--rim);
+  transition: transform 0.12s;
+}
+.related a:hover { transform: translateY(-2px); }
+.related b { display: block; font: 600 1.15rem/1.25 var(--label); text-decoration: underline 2px var(--mark); text-underline-offset: 0.2em; }
+.related span { display: block; margin-top: 6px; color: var(--card-muted); font-size: 0.98rem; line-height: 1.4; }
+/* The landing page's links to the feature pages, under the tiles. */
+.closer { margin-top: 32px; }
+.closer-title { margin: 0 0 10px; font: 600 1.1rem var(--label); color: var(--text); }
+.link-chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.link-chips a {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 6px 16px; border-radius: 999px;
+  background: var(--card); color: var(--text); border: 2px solid var(--rim); box-shadow: 0 3px 0 var(--rim);
+  font: 600 1rem/1.2 var(--label); text-decoration: none; transition: transform 0.12s;
+}
+.link-chips a:hover { transform: translateY(-2px); }
+.popular { margin-top: 12px; }
+
+/* ---------- Footer ---------- */
+.site-footer {
+  border-top: 1px solid var(--hairline); background: var(--band);
+  padding: 32px 0 calc(40px + env(safe-area-inset-bottom)); color: var(--muted); font-size: 0.95rem;
+}
+.site-footer .wrap { display: grid; gap: 12px; }
+.footer-links { display: flex; flex-wrap: wrap; gap: 0 20px; list-style: none; padding: 0; margin: 0; }
+.footer-links a {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 48px;
+  color: var(--text); font: 600 1rem var(--label); text-decoration: none;
+}
+.footer-links a:hover, .footer-links a[aria-current="page"] { text-decoration: underline 2px var(--mark); }
+.site-footer p { margin: 0; }
+/* The feature pages and switching, on every page's footer. */
+.footer-nav { display: grid; gap: 12px 48px; padding-bottom: 14px; margin-bottom: 4px; border-bottom: 1px solid var(--hairline); }
+.site-footer .footer-head { margin: 4px 0 0; font: 0.8rem/1.3 var(--stencil); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); }
+/* Who made it, with the Battle Baseball wordmark (owner's request 2026-11-06). */
+.made-by {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+  padding-bottom: 20px; margin-bottom: 8px; border-bottom: 1px solid var(--hairline);
+}
+.made-by .battle-baseball { width: 168px; height: auto; flex: none; overflow: visible; }
+.made-by p { flex: 1 1 220px; color: var(--text); font: 600 1.05rem/1.4 var(--label); }
+/* Apple's credit line, on the pages that show the App Store badge. */
+.site-footer .credit { font-size: 0.85rem; }
+@media (min-width: 760px) {
+  .site-footer .wrap { grid-template-columns: 1fr auto; align-items: center; }
+  .site-footer :is(.made-by, .credit, .footer-nav) { grid-column: 1 / -1; }
+  .footer-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  .btn:active, .swatches label:hover, .apps a:hover, .related a:hover, .link-chips a:hover { transform: none; }
+}
+
+/* ================= Battle Baseball ================= */
+
+.brand .mark { width: 34px; height: 34px; flex: none; }
+.battle-baseball { overflow: visible; display: block; }
+.hero-mark { width: min(420px, 86vw); height: auto; margin: 0 auto 18px; }
+@media (min-width: 1024px) { .hero-mark { margin-left: 0; } }
+.showcase-word { color: var(--maybe); }
+
+/* The player card: what a parent shares after a showcase. */
+.player-card {
+  position: relative; overflow: hidden; max-width: 380px; margin: 0 auto;
+  background: var(--card); color: var(--text);
+  border: 2px solid var(--rim); border-radius: 26px; box-shadow: 0 6px 0 var(--rim);
+  padding: 26px 26px 24px 32px; transform: rotate(2deg);
+}
+.player-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 8px; background: var(--coral); }
+.player-card .eyebrow { margin-bottom: 6px; }
+.player-card .name { font: 2.3rem/1 var(--display); text-shadow: 0 3px 0 var(--drop); margin: 0 0 4px; }
+.player-card .meta { color: var(--card-muted); margin: 0 0 18px; }
+.player-card .velo { display: flex; align-items: baseline; gap: 8px; margin: 0; }
+.player-card .velo b { font: 400 4.6rem/0.9 var(--display); color: var(--lemon); text-shadow: 0 4px 0 var(--drop); }
+.player-card .velo span { font: 600 1.4rem var(--label); color: var(--card-muted); }
+.player-card .where { color: var(--card-muted); font-size: 0.98rem; margin: 6px 0 16px; }
+.badges { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+  font: 600 0.95rem/1.2 var(--label); color: #050c1f;
+  border: 2px solid #050c1f; border-radius: 12px; box-shadow: 0 3px 0 #050c1f;
+}
+.badge.mvp { background: var(--lemon); }
+.badge.pitcher { background: var(--blue); }
+.badge.hitter { background: var(--coral); }
+.badge.defender { background: var(--mint); }
+.badge.hustle { background: var(--grape); }
+.sample { margin: 18px 0 0; text-align: center; color: var(--muted); font-size: 0.9rem; }
+
+/* Upcoming events, filled in from the app's data. */
+.events { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
+.event {
+  position: relative; overflow: hidden; display: block; height: 100%;
+  background: var(--card); color: var(--text); text-decoration: none;
+  border: 2px solid var(--rim); border-radius: 20px; box-shadow: 0 4px 0 var(--rim);
+  padding: 18px 18px 18px 26px; transition: transform 0.12s;
+}
+a.event:hover { transform: translateY(-2px); text-decoration: none; }
+.event::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 6px; background: var(--edge, var(--mint)); }
+.event h3 { margin: 0 0 6px; font-size: 1.45rem; }
+.event p { margin: 0 0 10px; color: var(--card-muted); }
+.chip {
+  display: inline-block; margin: 0 6px 6px 0; padding: 3px 11px; border-radius: 999px;
+  font: 600 0.88rem/1.3 var(--label); background: var(--page); color: var(--text); border: 1.5px solid var(--rim);
+}
+.chip.go { background: var(--mint); color: #050c1f; border-color: #050c1f; }
+.event.coming { --edge: var(--lemon); }
+
+/* Forms (host inquiry). */
+.form { display: grid; gap: 14px; max-width: 640px; }
+.form label { display: grid; gap: 6px; font: 600 1rem var(--label); }
+.form input, .form textarea, .form select {
+  font: 600 1rem/1.4 var(--body); color: var(--text); background: var(--field);
+  border: 2px solid var(--rim); border-radius: 14px; padding: 12px 14px; width: 100%;
+}
+.form input:focus, .form textarea:focus, .form select:focus { outline: none; border-color: var(--blue); }
+.form textarea { min-height: 120px; resize: vertical; }
+.form .row { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
+.form-status { font: 600 1.05rem var(--label); min-height: 1.5em; margin: 0; }
+.form-status.ok { color: var(--going); }
+.form-status.err { color: var(--accent); }
+.hp { position: absolute; left: -9999px; }
+
+/* Coming soon: the Battle Paddle. */
+.soon {
+  display: inline-block; padding: 4px 12px 3px; margin-bottom: 12px;
+  font: 0.85rem/1.2 var(--stencil); letter-spacing: 0.14em; text-transform: uppercase;
+  background: var(--lemon); color: #050c1f; border: 2px solid #050c1f; border-radius: 8px; transform: rotate(-3deg);
+}
+.shop-grid { display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
+.shop-grid .tile { padding-bottom: 24px; }
+.money { font: 400 2rem/1 var(--display); color: var(--going); text-shadow: 0 3px 0 var(--drop); }
