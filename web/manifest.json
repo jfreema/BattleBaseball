@@ -5,8 +5,8 @@
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#474C2B",
-  "theme_color": "#474C2B",
+  "background_color": "#1F4FC4",
+  "theme_color": "#1F4FC4",
   "prefer_related_applications": false,
   "icons": [
     { "src": "icons/Icon-192.png", "sizes": "192x192", "type": "image/png" },

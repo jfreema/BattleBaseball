@@ -524,7 +524,7 @@ class _CardRow extends StatelessWidget {
                       border: Border.all(color: BB.ink, width: 2.5),
                       boxShadow: BB.lip(3),
                     ),
-                    child: const BBIcon(BBGlyph.plus, size: 24, color: BB.ink),
+                    child: BBIcon(BBGlyph.plus, size: 24, color: BB.ink),
                   ),
                   const SizedBox(height: 15),
                   Text('Add player', textAlign: TextAlign.center, style: BB.labelStyle(17, color: BB.ink, height: 1.1)),
@@ -620,7 +620,7 @@ class _HostLine extends StatelessWidget {
     return Container(
       // The link's own 44 px target supplies the rest of the breathing room.
       padding: const EdgeInsets.only(top: 9),
-      decoration: const BoxDecoration(border: Border(top: BorderSide(color: BB.hairline))),
+      decoration: BoxDecoration(border: Border(top: BorderSide(color: BB.hairline))),
       child: Wrap(
         spacing: 6,
         crossAxisAlignment: WrapCrossAlignment.center,
@@ -641,7 +641,7 @@ class _Footer extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         margin: const EdgeInsets.only(top: 9),
         padding: const EdgeInsets.only(top: 6),
-        decoration: const BoxDecoration(border: Border(top: BorderSide(color: BB.hairline))),
+        decoration: BoxDecoration(border: Border(top: BorderSide(color: BB.hairline))),
         child: Row(
           children: [
             TextLink('Privacy', size: 14, onTap: () => openSitePage('/privacy')),

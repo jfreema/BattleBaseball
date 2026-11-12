@@ -8,12 +8,12 @@
 @font-face { font-family: "Nunito"; src: url("/fonts/nunito.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
 
 :root {
-  --field: #474c2b;
-  --cream: #f4ead0;
-  --kraft: #e3d6b3;
-  --ink: #1a1a18;
-  --ink2: #5a5546;
-  --coral: #f45b5b;
+  --field: #1f4fc4;
+  --cream: #f5efdf;
+  --kraft: #e4dbc3;
+  --ink: #0f1a3a;
+  --ink2: #4f5873;
+  --coral: #ffc627;
   --display: "Lilita One", "Arial Rounded MT Bold", system-ui, sans-serif;
   --stencil: "Black Ops One", "Lilita One", system-ui, sans-serif;
   --label: "Fredoka", "Arial Rounded MT Bold", system-ui, sans-serif;

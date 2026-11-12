@@ -469,7 +469,7 @@ class _Fact extends StatelessWidget {
             ),
           ),
           if (onTap != null)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(left: 8, top: 2),
               child: BBIcon(BBGlyph.external, size: 17, color: BB.creamSoft),
             ),
@@ -523,7 +523,7 @@ class _DivisionRow extends StatelessWidget {
               d.full ? const Pill('Waitlist') : Pill('${d.open} open', color: BB.mint),
             ],
             if (onTap != null)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(left: 6),
                 child: BBIcon(BBGlyph.forward, size: 20, color: BB.ink),
               )
@@ -900,7 +900,7 @@ class _PayRow extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: SizedBox(height: 1.5, child: ColoredBox(color: BB.inkRule)),
           ),
@@ -971,7 +971,7 @@ class _Consent extends StatelessWidget {
                     border: Border.all(color: focused ? BB.cream : BB.ink, width: 2),
                     boxShadow: BB.lip(2),
                   ),
-                  child: value ? const Center(child: BBIcon(BBGlyph.check, size: 18, color: BB.ink)) : null,
+                  child: value ? Center(child: BBIcon(BBGlyph.check, size: 18, color: BB.ink)) : null,
                 ),
               ),
             ),
@@ -992,7 +992,7 @@ class _Consent extends StatelessWidget {
                       text: 'waiver',
                       recognizer: link,
                       mouseCursor: SystemMouseCursors.click,
-                      style: const TextStyle(
+                      style: TextStyle(
                         decoration: TextDecoration.underline,
                         decorationColor: BB.coral,
                         decorationThickness: 2.4,

@@ -7,7 +7,7 @@
   <meta name="description" content="{{description}}">
   <link rel="canonical" href="https://showcase.getbattleplan.app{{path}}">
   <meta name="color-scheme" content="light">
-  <meta name="theme-color" content="#474c2b">
+  <meta name="theme-color" content="#1f4fc4">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Battle Baseball">
@@ -20,6 +20,19 @@
   <link rel="preload" href="/fonts/nunito.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/black-ops-one.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/site.css">
+  <script>
+    // Match the color scheme an admin picked, which the app saves here.
+    (function () {
+      try {
+        var c = JSON.parse(localStorage.getItem('bb.scheme') || 'null');
+        if (!c) return;
+        var st = document.documentElement.style;
+        ['field', 'cream', 'kraft', 'ink', 'ink2', 'coral'].forEach(function (k) {
+          if (/^#[0-9a-f]{6}$/i.test(c[k] || '')) st.setProperty('--' + k, c[k]);
+        });
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body data-page="{{path}}">
   <a class="skip" href="#main">Skip to content</a>

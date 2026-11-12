@@ -1,41 +1,50 @@
-// Battle Baseball's look, "The Card": an olive field, cream card stock, ink
-// outlines on hard ink lips, and one coral accent. The tokens, the theme and
-// the small primitives every screen is built from.
+// Battle Baseball's look, "The Card": a colored field, cream card stock, ink
+// outlines on hard ink lips, and one accent. The colors come from the scheme
+// in use (schemes.dart). The tokens, the theme and the small primitives every
+// screen is built from.
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
+import 'package:battle_baseball/design/schemes.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+export 'package:battle_baseball/design/schemes.dart';
+
 abstract final class BB {
+  /// The scheme every color below comes from. Set by [SchemeController];
+  /// screens read it fresh on each build.
+  static BBScheme scheme = BBSchemes.fallback;
+
   // The field.
-  static const field = Color(0xFF474C2B);
-  static const fieldDeep = Color(0xFF2B2F18);
-  static const fieldRaised = Color(0xFF575A3A);
+  static Color get field => scheme.field;
+  static Color get fieldDeep => scheme.fieldDeep;
+  static Color get fieldRaised => scheme.fieldRaised;
 
   // Paper and ink.
-  static const cream = Color(0xFFF4EAD0);
-  static const creamSoft = Color(0xD1F4EAD0);
-  static const hairline = Color(0x29F4EAD0);
-  static const dashed = Color(0x6BF4EAD0);
-  static const kraft = Color(0xFFE3D6B3);
-  static const ink = Color(0xFF1A1A18);
-  static const ink2 = Color(0xFF5A5546);
+  static Color get cream => scheme.cream;
+  static Color get creamSoft => scheme.cream.withAlpha(scheme.softAlpha);
+  static Color get hairline => scheme.cream.withAlpha(0x29);
+  static Color get dashed => scheme.cream.withAlpha(0x6B);
+  static Color get kraft => scheme.kraft;
+  static Color get ink => scheme.ink;
+  static Color get ink2 => scheme.ink2;
 
   /// A faint rule on paper (ink at 16%).
-  static const inkRule = Color(0x291A1A18);
+  static Color get inkRule => scheme.ink.withAlpha(0x29);
 
-  // One accent, and two colors with one job each.
-  static const coral = Color(0xFFF45B5B);
-  static const coralDeep = Color(0xFFE4494D);
-  static const seam = Color(0xFFC0262F);
+  // One accent (named coral after the original scheme), and two colors with
+  // one job each.
+  static Color get coral => scheme.accent;
+  static Color get coralDeep => scheme.accentDeep;
+  static Color get seam => scheme.seam;
 
   /// Honors only: award seals and first place.
-  static const lemon = Color(0xFFF8D84A);
+  static Color get lemon => scheme.honors;
 
   /// Spots open only.
-  static const mint = Color(0xFF58C173);
+  static Color get mint => scheme.mint;
 
   /// Phone layout below this width, desktop at or above it.
   static const breakpoint = 960.0;
@@ -61,14 +70,14 @@ abstract final class BB {
       [BoxShadow(color: ink, offset: Offset(0, depth))];
 
   /// Lilita One on the field: cream on a hard ink drop.
-  static TextStyle title(double size, {Color color = cream, double? drop}) => TextStyle(
+  static TextStyle title(double size, {Color? color, double? drop}) => TextStyle(
         fontFamily: display,
         // Lilita has one weight; inheriting a bolder one would fake-embolden it.
         fontWeight: FontWeight.w400,
         fontSize: size,
         height: 1.05,
         letterSpacing: size * 0.005,
-        color: color,
+        color: color ?? cream,
         leadingDistribution: TextLeadingDistribution.even,
         shadows: [
           Shadow(
@@ -79,19 +88,19 @@ abstract final class BB {
       );
 
   /// Lilita One printed on paper: flat ink, no drop.
-  static TextStyle lilita(double size, {Color color = ink, double height = 1.05}) => TextStyle(
+  static TextStyle lilita(double size, {Color? color, double height = 1.05}) => TextStyle(
         fontFamily: display,
         fontWeight: FontWeight.w400,
         fontSize: size,
         height: height,
-        color: color,
+        color: color ?? ink,
         leadingDistribution: TextLeadingDistribution.even,
       );
 
   /// Fredoka: buttons, chips, tab labels, names in rows.
   static TextStyle labelStyle(
     double size, {
-    Color color = cream,
+    Color? color,
     FontWeight weight = FontWeight.w600,
     double? height,
   }) =>
@@ -99,7 +108,7 @@ abstract final class BB {
         fontFamily: label,
         fontSize: size,
         height: height,
-        color: color,
+        color: color ?? cream,
         fontWeight: weight,
         leadingDistribution: TextLeadingDistribution.even,
       );
@@ -107,7 +116,7 @@ abstract final class BB {
   /// Fredoka small caps, tracked. Pass the text already in upper case.
   static TextStyle caps(
     double size, {
-    Color color = creamSoft,
+    Color? color,
     double tracking = 0.1,
     FontWeight weight = FontWeight.w700,
   }) =>
@@ -115,7 +124,7 @@ abstract final class BB {
         fontFamily: label,
         fontSize: size,
         height: 1,
-        color: color,
+        color: color ?? creamSoft,
         fontWeight: weight,
         letterSpacing: size * tracking,
         leadingDistribution: TextLeadingDistribution.even,
@@ -124,7 +133,7 @@ abstract final class BB {
   /// Nunito: the rare sentence.
   static TextStyle bodyStyle(
     double size, {
-    Color color = creamSoft,
+    Color? color,
     FontWeight weight = FontWeight.w700,
     double height = 1.4,
   }) =>
@@ -132,24 +141,24 @@ abstract final class BB {
         fontFamily: body,
         fontSize: size,
         height: height,
-        color: color,
+        color: color ?? creamSoft,
         fontWeight: weight,
       );
 
   /// Black Ops One: only for things stamped on paper.
-  static TextStyle stencilStyle(double size, {Color color = ink, double tracking = 0.16}) =>
+  static TextStyle stencilStyle(double size, {Color? color, double tracking = 0.16}) =>
       TextStyle(
         fontFamily: stencil,
         fontWeight: FontWeight.w400,
         fontSize: size,
         height: 1,
-        color: color,
+        color: color ?? ink,
         letterSpacing: size * tracking,
         leadingDistribution: TextLeadingDistribution.even,
       );
 
   static ThemeData theme() {
-    const scheme = ColorScheme(
+    final scheme = ColorScheme(
       brightness: Brightness.dark,
       primary: coral,
       onPrimary: ink,
@@ -199,7 +208,7 @@ abstract final class BB {
         );
     final panel = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(22),
-      side: const BorderSide(color: ink, width: 2.5),
+      side: BorderSide(color: ink, width: 2.5),
     );
     final pillButton = ButtonStyle(
       textStyle: WidgetStatePropertyAll(labelStyle(16)),
@@ -270,7 +279,7 @@ abstract final class BB {
         selectionColor: coral.withValues(alpha: 0.45),
         selectionHandleColor: coral,
       ),
-      dividerTheme: const DividerThemeData(color: hairline, space: 1, thickness: 1),
+      dividerTheme: DividerThemeData(color: hairline, space: 1, thickness: 1),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: cream,
         contentTextStyle: labelStyle(15.5, color: ink),
@@ -279,7 +288,7 @@ abstract final class BB {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: ink, width: 2.5),
+          side: BorderSide(color: ink, width: 2.5),
         ),
       ),
       chipTheme: ChipThemeData(
@@ -307,7 +316,7 @@ abstract final class BB {
         labelPadding: const EdgeInsets.symmetric(horizontal: 7),
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
         deleteIconColor: cream,
-        iconTheme: const IconThemeData(color: cream, size: 18),
+        iconTheme: IconThemeData(color: cream, size: 18),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: fieldDeep,
@@ -317,13 +326,13 @@ abstract final class BB {
         contentTextStyle: bodyStyle(16),
         shape: panel,
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: fieldDeep,
         modalBackgroundColor: fieldDeep,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         modalElevation: 0,
-        modalBarrierColor: Color(0x991A1A18),
+        modalBarrierColor: ink.withAlpha(0x99),
         showDragHandle: false,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
@@ -337,7 +346,7 @@ abstract final class BB {
         textStyle: labelStyle(16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: ink, width: 2),
+          side: BorderSide(color: ink, width: 2),
         ),
       ),
       switchTheme: SwitchThemeData(
@@ -347,7 +356,7 @@ abstract final class BB {
         trackColor: WidgetStateProperty.resolveWith(
           (s) => s.contains(WidgetState.selected) ? coral : fieldRaised,
         ),
-        trackOutlineColor: const WidgetStatePropertyAll(ink),
+        trackOutlineColor: WidgetStatePropertyAll(ink),
         trackOutlineWidth: const WidgetStatePropertyAll(2),
         overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
@@ -355,7 +364,7 @@ abstract final class BB {
         fillColor: WidgetStateProperty.resolveWith(
           (s) => s.contains(WidgetState.selected) ? coral : fieldRaised,
         ),
-        checkColor: const WidgetStatePropertyAll(ink),
+        checkColor: WidgetStatePropertyAll(ink),
         side: WidgetStateBorderSide.resolveWith(
           (s) => BorderSide(color: s.contains(WidgetState.selected) ? ink : creamSoft, width: 2),
         ),
@@ -368,33 +377,33 @@ abstract final class BB {
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: pillButton.copyWith(foregroundColor: const WidgetStatePropertyAll(cream)),
+        style: pillButton.copyWith(foregroundColor: WidgetStatePropertyAll(cream)),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: pillButton.copyWith(
-          backgroundColor: const WidgetStatePropertyAll(coral),
-          foregroundColor: const WidgetStatePropertyAll(ink),
-          side: const WidgetStatePropertyAll(BorderSide(color: ink, width: 2)),
+          backgroundColor: WidgetStatePropertyAll(coral),
+          foregroundColor: WidgetStatePropertyAll(ink),
+          side: WidgetStatePropertyAll(BorderSide(color: ink, width: 2)),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: pillButton.copyWith(
-          backgroundColor: const WidgetStatePropertyAll(cream),
-          foregroundColor: const WidgetStatePropertyAll(ink),
-          side: const WidgetStatePropertyAll(BorderSide(color: ink, width: 2)),
+          backgroundColor: WidgetStatePropertyAll(cream),
+          foregroundColor: WidgetStatePropertyAll(ink),
+          side: WidgetStatePropertyAll(BorderSide(color: ink, width: 2)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: pillButton.copyWith(
-          foregroundColor: const WidgetStatePropertyAll(cream),
-          side: const WidgetStatePropertyAll(BorderSide(color: dashed, width: 2)),
+          foregroundColor: WidgetStatePropertyAll(cream),
+          side: WidgetStatePropertyAll(BorderSide(color: dashed, width: 2)),
         ),
       ),
-      iconButtonTheme: const IconButtonThemeData(
+      iconButtonTheme: IconButtonThemeData(
         style: ButtonStyle(foregroundColor: WidgetStatePropertyAll(cream)),
       ),
-      iconTheme: const IconThemeData(color: cream),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      iconTheme: IconThemeData(color: cream),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: coral,
         foregroundColor: ink,
         elevation: 0,
@@ -426,7 +435,7 @@ abstract final class BB {
         ),
         textStyle: labelStyle(13, color: ink),
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(color: cream),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: cream),
     );
   }
 }
@@ -563,7 +572,7 @@ class LipBox extends StatelessWidget {
   const LipBox({
     super.key,
     required this.child,
-    this.color = BB.cream,
+    this.color,
     this.radius = 16,
     this.border = 2.5,
     this.lip = 4,
@@ -573,7 +582,8 @@ class LipBox extends StatelessWidget {
   });
 
   final Widget child;
-  final Color color;
+  final Color? color;
+  Color get _color => color ?? BB.cream;
   final double radius;
   final double border;
   final double lip;
@@ -590,10 +600,10 @@ class LipBox extends StatelessWidget {
       padding: EdgeInsets.only(top: down ? lip : 0, bottom: down ? 0 : lip),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: color,
+          color: _color,
           borderRadius: r,
           boxShadow: [
-            if (focused) const BoxShadow(color: BB.cream, spreadRadius: 3),
+            if (focused) BoxShadow(color: BB.cream, spreadRadius: 3),
             if (!down) BoxShadow(color: BB.ink, offset: Offset(0, lip)),
           ],
         ),
@@ -635,7 +645,7 @@ class Paper extends StatelessWidget {
   const Paper({
     super.key,
     required this.child,
-    this.color = BB.cream,
+    this.color,
     this.radius = 16,
     this.lip = 4,
     this.padding = const EdgeInsets.all(14),
@@ -645,7 +655,8 @@ class Paper extends StatelessWidget {
   });
 
   final Widget child;
-  final Color color;
+  final Color? color;
+  Color get _color => color ?? BB.cream;
   final double radius;
   final double lip;
   final EdgeInsetsGeometry padding;
@@ -657,7 +668,7 @@ class Paper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LipBox(
-        color: color,
+        color: _color,
         radius: radius,
         lip: lip,
         onTap: onTap,
@@ -666,7 +677,7 @@ class Paper extends StatelessWidget {
         child: DefaultTextStyle.merge(
           style: BB.labelStyle(17, color: BB.ink),
           child: IconTheme.merge(
-            data: const IconThemeData(color: BB.ink),
+            data: IconThemeData(color: BB.ink),
             child: Padding(padding: padding, child: child),
           ),
         ),
@@ -796,7 +807,7 @@ class BBButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: BB.ink, width: small ? 2 : 2.5),
             boxShadow: [
-              if (focused) const BoxShadow(color: BB.cream, spreadRadius: 3),
+              if (focused) BoxShadow(color: BB.cream, spreadRadius: 3),
               if (!down) BoxShadow(color: BB.ink, offset: Offset(0, lip)),
             ],
           ),
@@ -819,11 +830,12 @@ class BBButton extends StatelessWidget {
 /// A text link: Fredoka with a 3 px coral underline. Use [color] `BB.ink`
 /// on paper.
 class TextLink extends StatelessWidget {
-  const TextLink(this.label, {super.key, required this.onTap, this.color = BB.cream, this.size = 16});
+  const TextLink(this.label, {super.key, required this.onTap, this.color, this.size = 16});
 
   final String label;
   final VoidCallback? onTap;
-  final Color color;
+  final Color? color;
+  Color get _color => color ?? BB.cream;
   final double size;
 
   @override
@@ -845,10 +857,10 @@ class TextLink extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 3),
                   decoration: BoxDecoration(
                     border: Border(
-                      bottom: BorderSide(color: focused ? color : BB.coral, width: 3),
+                      bottom: BorderSide(color: focused ? _color : BB.coral, width: 3),
                     ),
                   ),
-                  child: Text(label, style: BB.labelStyle(size, color: color, height: 1.15)),
+                  child: Text(label, style: BB.labelStyle(size, color: _color, height: 1.15)),
                 ),
               ),
             ),
@@ -860,10 +872,11 @@ class TextLink extends StatelessWidget {
 /// A 26 px status pill. Mint for spots open, lemon for honors, cream for
 /// everything else.
 class Pill extends StatelessWidget {
-  const Pill(this.label, {super.key, this.color = BB.cream});
+  const Pill(this.label, {super.key, this.color});
 
   final String label;
-  final Color color;
+  final Color? color;
+  Color get _color => color ?? BB.cream;
 
   @override
   Widget build(BuildContext context) => Align(
@@ -874,7 +887,7 @@ class Pill extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 26),
           padding: const EdgeInsets.fromLTRB(10, 3, 10, 4),
           decoration: BoxDecoration(
-            color: color,
+            color: _color,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: BB.ink, width: 2),
           ),
@@ -891,10 +904,11 @@ class Pill extends StatelessWidget {
 
 /// The stencil stamp ("SAMPLE"), set at a slight angle.
 class Stamp extends StatelessWidget {
-  const Stamp(this.text, {super.key, this.color = BB.cream, this.fill});
+  const Stamp(this.text, {super.key, this.color, this.fill});
 
   final String text;
-  final Color color;
+  final Color? color;
+  Color get _color => color ?? BB.cream;
 
   /// A backing color, for a stamp that floats over other things.
   final Color? fill;
@@ -911,12 +925,12 @@ class Stamp extends StatelessWidget {
             decoration: BoxDecoration(
               color: fill,
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: color, width: 2),
+              border: Border.all(color: _color, width: 2),
             ),
             child: Text(
               text.toUpperCase(),
               textScaler: TextScaler.noScaling,
-              style: BB.stencilStyle(12, color: color),
+              style: BB.stencilStyle(12, color: _color),
             ),
           ),
         ),
@@ -1009,7 +1023,7 @@ class OutlinedText extends StatelessWidget {
     this.text, {
     super.key,
     required this.size,
-    this.fill = BB.cream,
+    this.fill,
     this.stroke = 4,
     this.drop = 2.5,
     this.height = 1,
@@ -1018,7 +1032,8 @@ class OutlinedText extends StatelessWidget {
 
   final String text;
   final double size;
-  final Color fill;
+  final Color? fill;
+  Color get _fill => fill ?? BB.cream;
   final double stroke;
   final double drop;
   final double height;
@@ -1053,7 +1068,7 @@ class OutlinedText extends StatelessWidget {
             child: ExcludeSemantics(child: layer(base.copyWith(color: BB.ink))),
           ),
         ExcludeSemantics(child: layer(outline)),
-        layer(base.copyWith(color: fill)),
+        layer(base.copyWith(color: _fill)),
       ],
     );
   }
@@ -1113,14 +1128,15 @@ class Wordmark extends StatelessWidget {
 
 /// A drawn icon on its own as a 44 px button.
 class IconTap extends StatelessWidget {
-  const IconTap(this.glyph, {super.key, required this.label, required this.onTap, this.color = BB.ink});
+  const IconTap(this.glyph, {super.key, required this.label, required this.onTap, this.color});
 
   final BBGlyph glyph;
 
   /// What a screen reader says: "Copy code".
   final String label;
   final VoidCallback? onTap;
-  final Color color;
+  final Color? color;
+  Color get _color => color ?? BB.ink;
 
   @override
   Widget build(BuildContext context) => Pressable(
@@ -1136,9 +1152,9 @@ class IconTap extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: focused ? color : Colors.transparent, width: 2),
+                border: Border.all(color: focused ? _color : Colors.transparent, width: 2),
               ),
-              child: Opacity(opacity: down ? 0.5 : 1, child: BBIcon(glyph, size: 21, color: color)),
+              child: Opacity(opacity: down ? 0.5 : 1, child: BBIcon(glyph, size: 21, color: _color)),
             ),
           ),
         ),
@@ -1260,7 +1276,7 @@ class LoadingField extends StatelessWidget {
           padding: const EdgeInsets.all(48),
           child: Semantics(
             label: 'Loading',
-            child: const SizedBox(
+            child: SizedBox(
               width: 28,
               height: 28,
               child: CircularProgressIndicator(strokeWidth: 3, color: BB.creamSoft),
@@ -1292,7 +1308,7 @@ void toast(BuildContext context, String message) {
       shape: LipShape(
         RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: BB.ink, width: 2.5),
+          side: BorderSide(color: BB.ink, width: 2.5),
         ),
         lip: 4,
       ),
@@ -1336,7 +1352,7 @@ Future<void> showFinePrint(
                 Pressable(
                   onTap: () => Navigator.of(context).pop(),
                   label: 'Close',
-                  builder: (context, down, focused) => const SizedBox(
+                  builder: (context, down, focused) => SizedBox(
                     width: 44,
                     height: 44,
                     child: Center(child: BBIcon(BBGlyph.close, size: 22, color: BB.cream)),
@@ -1651,10 +1667,11 @@ void paintDashes(
 
 /// A dashed ink rule, the perforation on a ticket.
 class DashedRule extends StatelessWidget {
-  const DashedRule({super.key, this.axis = Axis.horizontal, this.color = BB.ink, this.thickness = 2});
+  const DashedRule({super.key, this.axis = Axis.horizontal, this.color, this.thickness = 2});
 
   final Axis axis;
-  final Color color;
+  final Color? color;
+  Color get _color => color ?? BB.ink;
   final double thickness;
 
   @override
@@ -1662,7 +1679,7 @@ class DashedRule extends StatelessWidget {
         size: axis == Axis.horizontal
             ? Size(double.infinity, thickness)
             : Size(thickness, double.infinity),
-        painter: _DashPainter(axis, color, thickness),
+        painter: _DashPainter(axis, _color, thickness),
       );
 }
 

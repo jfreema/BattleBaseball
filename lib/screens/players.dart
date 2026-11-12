@@ -129,7 +129,7 @@ class _PlayersViewState extends State<_PlayersView> {
             autocorrect: false,
             decoration: InputDecoration(
               hintText: 'Search players',
-              prefixIcon: const SizedBox(
+              prefixIcon: SizedBox(
                 width: 48,
                 height: 48,
                 child: Center(child: BBIcon(BBGlyph.search, size: 20, color: BB.creamSoft)),
@@ -142,7 +142,7 @@ class _PlayersViewState extends State<_PlayersView> {
                         setState(() => _query = '');
                       },
                       label: 'Clear search',
-                      builder: (context, down, focused) => const SizedBox(
+                      builder: (context, down, focused) => SizedBox(
                         width: 48,
                         height: 48,
                         child: Center(child: BBIcon(BBGlyph.close, size: 18, color: BB.creamSoft)),

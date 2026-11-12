@@ -1,7 +1,10 @@
 // Sample data for looking at the app before real showcases exist. Opening the
 // app with ?demo=1 swaps this in for the Firestore repo: every read answers
-// from the lists below and every write fails with StateError('Sample data.').
+// from the lists below and every write fails with StateError('Sample data.'),
+// except the color scheme, which is kept in memory.
 // Nothing here is shown in the real app. Ids start with "demo-".
+import 'dart:async';
+
 import 'package:battle_baseball/data/models.dart';
 import 'package:battle_baseball/data/repo.dart';
 import 'package:battle_baseball/data/sample.dart';
@@ -565,6 +568,23 @@ class DemoRepo extends Repo {
       _no();
   @override
   Future<void> savePaymentSettings(PaymentSettings p) => _no();
+
+  // Sample mode keeps the picked scheme in memory, so the Color scheme
+  // screen can be tried end to end. Nothing is saved.
+  static String? _scheme;
+  static final _schemeChanges = StreamController<String?>.broadcast();
+
+  @override
+  Stream<String?> colorScheme() async* {
+    yield _scheme;
+    yield* _schemeChanges.stream;
+  }
+
+  @override
+  Future<void> saveColorScheme(String id) async {
+    _scheme = id;
+    _schemeChanges.add(id);
+  }
   @override
   Future<void> setAdmin(AppUser u) => _no();
   @override

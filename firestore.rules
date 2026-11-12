@@ -65,6 +65,17 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
+    // ---------- Color scheme (any Battle Baseball admin) ----------
+
+    match /config/theme {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['scheme', 'updatedBy', 'updatedAt'])
+        && request.resource.data.scheme in
+             ['royal', 'navy', 'carolina', 'spring', 'clay', 'night', 'christmas', 'olive']
+        && request.resource.data.updatedBy == me();
+    }
+
     match /auditLogs/{id} {
       allow read: if isOwner();
       allow create: if isAdmin() && request.resource.data.by == me();

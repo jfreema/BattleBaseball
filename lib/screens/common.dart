@@ -207,7 +207,7 @@ class BackHeader extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const BBIcon(BBGlyph.back, size: 24, color: BB.cream),
+                BBIcon(BBGlyph.back, size: 24, color: BB.cream),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Padding(

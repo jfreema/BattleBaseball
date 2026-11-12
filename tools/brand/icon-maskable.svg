@@ -2,12 +2,12 @@
   <!-- The maskable app icon: the mark kept inside the middle 80 percent, the
        part every launcher's mask leaves alone, for Icon-maskable-192.png and
        Icon-maskable-512.png. -->
-  <rect width="64" height="64" fill="#474C2B"/>
+  <rect width="64" height="64" fill="#1F4FC4"/>
   <g transform="translate(32 32.5) scale(.68) translate(-32 -32.5)">
-    <g stroke="#1A1A18" stroke-width="3.5" stroke-linejoin="round">
-      <path d="M9 12h46v26L32 57 9 38z" fill="#1A1A18"/>
-      <path d="M9 8h46v26L32 53 9 34z" fill="#F4EAD0"/>
+    <g stroke="#0F1A3A" stroke-width="3.5" stroke-linejoin="round">
+      <path d="M9 12h46v26L32 57 9 38z" fill="#0F1A3A"/>
+      <path d="M9 8h46v26L32 53 9 34z" fill="#F5EFDF"/>
     </g>
-    <path fill="#1A1A18" transform="translate(21.65 37.1) scale(.033)" d="M541-519Q541-415 451-361Q500-343 533-299Q566-255 566-174.5Q566-94 506.5-47Q447 0 336 0L100 0Q83 0 72-11.5Q61-23 61-42L61-682Q61-693 64.5-696.5Q68-700 79-700L307-700Q541-700 541-519ZM253-538L253-407L258-407Q354-407 354-471Q354-506 335.5-522Q317-538 274-538L253-538ZM253-289L253-159L271-159Q314-159 334-175Q354-191 354-226Q354-261 335.5-275Q317-289 274-289L253-289Z"/>
+    <path fill="#0F1A3A" transform="translate(21.65 37.1) scale(.033)" d="M541-519Q541-415 451-361Q500-343 533-299Q566-255 566-174.5Q566-94 506.5-47Q447 0 336 0L100 0Q83 0 72-11.5Q61-23 61-42L61-682Q61-693 64.5-696.5Q68-700 79-700L307-700Q541-700 541-519ZM253-538L253-407L258-407Q354-407 354-471Q354-506 335.5-522Q317-538 274-538L253-538ZM253-289L253-159L271-159Q314-159 334-175Q354-191 354-226Q354-261 335.5-275Q317-289 274-289L253-289Z"/>
   </g>
 </svg>

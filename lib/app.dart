@@ -123,6 +123,7 @@ final router = GoRouter(
             GoRoute(path: 'payment-check', builder: (_, _) => const PaymentCheckScreen()),
             GoRoute(path: 'admins', builder: (_, _) => const AdminsScreen()),
             GoRoute(path: 'settings', builder: (_, _) => const PaymentSettingsScreen()),
+            GoRoute(path: 'colors', builder: (_, _) => const ColorSchemeScreen()),
           ],
         ),
         // Every shared component in its variants, for design review.
@@ -320,7 +321,7 @@ class _BottomBar extends StatelessWidget {
         height: 74 + _plateRise + inset,
         child: Stack(
           children: [
-            const Positioned(
+            Positioned(
               left: 0,
               right: 0,
               top: _plateRise,

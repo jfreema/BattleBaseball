@@ -117,7 +117,7 @@ class _AccountView extends StatelessWidget {
         _Row(
           'Battleplan',
           sub: 'Free team chat and schedules',
-          trailing: const BBIcon(BBGlyph.external, size: 20, color: BB.ink),
+          trailing: BBIcon(BBGlyph.external, size: 20, color: BB.ink),
           onTap: () => launchUrl(Uri.parse('https://getbattleplan.app')),
         ),
         const _Row('Battle Paddle', trailing: Pill('Coming soon')),
@@ -186,7 +186,7 @@ class _Row extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                trailing ?? const BBIcon(BBGlyph.forward, size: 22, color: BB.ink),
+                trailing ?? BBIcon(BBGlyph.forward, size: 22, color: BB.ink),
               ],
             ),
           ),

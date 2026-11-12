@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:battle_baseball/data/models.dart';
 import 'package:battle_baseball/data/repo.dart';
+import 'package:battle_baseball/data/scheme.dart';
 import 'package:battle_baseball/data/session.dart';
 import 'package:battle_baseball/design/bb.dart';
 import 'package:battle_baseball/design/card.dart';
@@ -85,7 +86,7 @@ class StaffRow extends StatelessWidget {
     this.leading,
     this.trailing,
     this.onTap,
-    this.color = BB.cream,
+    this.color,
     this.chevron = false,
     this.sink = true,
   });
@@ -95,7 +96,8 @@ class StaffRow extends StatelessWidget {
   final Widget? leading;
   final Widget? trailing;
   final VoidCallback? onTap;
-  final Color color;
+  final Color? color;
+  Color get _color => color ?? BB.cream;
 
   /// Ends the row in a chevron, for a row that leads somewhere.
   final bool chevron;
@@ -109,7 +111,7 @@ class StaffRow extends StatelessWidget {
         child: Paper(
           onTap: onTap,
           sink: sink,
-          color: color,
+          color: _color,
           radius: 14,
           padding: EdgeInsets.fromLTRB(leading == null ? 16 : 10, 8, 12, 8),
           child: ConstrainedBox(
@@ -144,7 +146,7 @@ class StaffRow extends StatelessWidget {
                 if (trailing != null) ...[const SizedBox(width: 10), trailing!],
                 if (chevron) ...[
                   const SizedBox(width: 8),
-                  const BBIcon(BBGlyph.forward, size: 22, color: BB.ink),
+                  BBIcon(BBGlyph.forward, size: 22, color: BB.ink),
                 ],
               ],
             ),
@@ -338,6 +340,8 @@ class AdminScreen extends StatelessWidget {
               StaffRow('Admins', chevron: true, onTap: () => context.go('/admin/admins')),
               StaffRow('Payment settings', chevron: true, onTap: () => context.go('/admin/settings')),
             ],
+            if (s.isAdmin)
+              StaffRow('Color scheme', chevron: true, onTap: () => context.go('/admin/colors')),
             if (payments) const SizedBox(height: 22),
             SectionTitle(
               'Showcases',
@@ -1036,7 +1040,7 @@ class _HeldCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               if (r.alreadyPaid)
-                const Pill('Says paid', color: BB.coral)
+                Pill('Says paid', color: BB.coral)
               else if (r.holdEnded)
                 const Pill('Hold ended')
               else if (r.holdEndsAt != null)
@@ -1312,6 +1316,145 @@ class _PaymentSettingsScreenState extends State<PaymentSettingsScreen> {
                       const SizedBox(height: 16),
                       BBButton.primary('Save', expand: true, busy: _busy, onPressed: _save),
                     ],
+        ),
+      );
+}
+
+/// Admins: the colors the whole app wears. Tapping a scheme tries it on this
+/// screen only; Use for everyone saves it to config/theme for every visitor.
+class ColorSchemeScreen extends StatefulWidget {
+  const ColorSchemeScreen({super.key});
+  @override
+  State<ColorSchemeScreen> createState() => _ColorSchemeScreenState();
+}
+
+class _ColorSchemeScreenState extends State<ColorSchemeScreen> {
+  final _schemes = SchemeController.instance;
+  bool _busy = false;
+
+  static const _help = [
+    FinePrintItem('Tap a scheme to try it on. Only you see it until you press Use for everyone.'),
+    FinePrintItem('Use for everyone changes the app and site for every visitor right away.'),
+    FinePrintItem('Every change is logged with who made it.'),
+  ];
+
+  @override
+  void dispose() {
+    // Leaving without saving puts back the scheme everyone sees.
+    _schemes.tryOn(null);
+    super.dispose();
+  }
+
+  Future<void> _use(BBScheme s) async {
+    setState(() => _busy = true);
+    final ok = await attempt(context, () => _schemes.save(s), done: 'Everyone now sees ${s.name}');
+    if (mounted) setState(() => _busy = false);
+    if (!ok) return;
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: Listenable.merge([Session.instance, _schemes]),
+        builder: (context, _) {
+          final trying = _schemes.preview;
+          final saved = _schemes.saved;
+          return StaffPage(
+            title: 'Color scheme',
+            children: !Session.instance.isAdmin
+                ? const [Quiet('Admins only.')]
+                : [
+                    for (final s in BBSchemes.all)
+                      StaffRow(
+                        s.name,
+                        sub: s.blurb,
+                        leading: _SchemeChip(s),
+                        trailing: s == saved
+                            ? const Pill('Everyone')
+                            : s == trying
+                                ? Pill('Trying', color: BB.coral)
+                                : null,
+                        onTap: _busy ? null : () => _schemes.tryOn(s == saved ? null : s),
+                      ),
+                    const SizedBox(height: 6),
+                    if (trying != null && trying != saved) ...[
+                      Text(
+                        'Only you see ${trying.name} right now.',
+                        style: BB.bodyStyle(16),
+                      ),
+                      const SizedBox(height: 14),
+                      BBButton.primary(
+                        'Use ${trying.name} for everyone',
+                        expand: true,
+                        busy: _busy,
+                        onPressed: () => _use(trying),
+                      ),
+                      const SizedBox(height: 12),
+                      BBButton.quiet(
+                        'Go back to ${saved.name}',
+                        expand: true,
+                        onPressed: _busy ? null : () => _schemes.tryOn(null),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    const HowThisWorks(_help),
+                  ],
+          );
+        },
+      );
+}
+
+/// A scheme in miniature: a card in its accent on its field.
+class _SchemeChip extends StatelessWidget {
+  const _SchemeChip(this.s);
+  final BBScheme s;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+        child: Container(
+          width: 58,
+          height: 44,
+          decoration: BoxDecoration(
+            color: s.field,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: BB.ink, width: 2),
+          ),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Transform.rotate(
+                angle: -0.08,
+                child: Container(
+                  width: 22,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: s.cream,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: s.ink, width: 1.5),
+                  ),
+                  padding: const EdgeInsets.all(2),
+                  alignment: Alignment.topCenter,
+                  child: Container(
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: s.accent,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 5),
+              Container(
+                width: 11,
+                height: 11,
+                decoration: BoxDecoration(
+                  color: s.honors,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: s.ink, width: 1.5),
+                ),
+              ),
+            ],
+          ),
         ),
       );
 }

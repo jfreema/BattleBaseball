@@ -9,7 +9,7 @@
   <title>Battle Baseball Showcase · Youth baseball in Baton Rouge</title>
   <meta name="description" content="Youth players sign up solo for a Battle Baseball Showcase in Baton Rouge, where every fastball gets clocked on radar and every player earns a card.">
   <link rel="canonical" href="https://showcase.getbattleplan.app/">
-  <meta name="theme-color" content="#474C2B">
+  <meta name="theme-color" content="#1F4FC4">
 
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Battle Baseball">
@@ -48,7 +48,25 @@
     })();
   </script>
 
+  <script>
+    // The colors of the scheme an admin last picked, saved by the app (see
+    // lib/data/scheme.dart), so this loading screen matches the app it opens
+    // into. Royal Blue, the default, is in the :root block below.
+    (function () {
+      try {
+        var c = JSON.parse(localStorage.getItem('bb.scheme') || 'null');
+        if (!c) return;
+        var st = document.documentElement.style;
+        ['field', 'cream', 'ink', 'coral'].forEach(function (k) {
+          if (/^#[0-9a-f]{6}$/i.test(c[k] || '')) st.setProperty('--' + k, c[k]);
+        });
+        if (c.field) document.querySelector('meta[name="theme-color"]').content = c.field;
+      } catch (e) {}
+    })();
+  </script>
+
   <style>
+    :root { --field: #1f4fc4; --cream: #f5efdf; --ink: #0f1a3a; --coral: #ffc627; }
     /* What a visitor sees while the app loads: the field, the wordmark and,
        at the front door, the headline and its one line. Sizes and positions
        mirror lib/screens/home.dart and the shell in lib/app.dart, so the
@@ -58,10 +76,10 @@
     @font-face { font-family: "Black Ops One"; src: url("assets/assets/fonts/black_ops_one/BlackOpsOne-Regular.ttf") format("truetype"); font-display: block; }
     @font-face { font-family: "Nunito"; font-weight: 700; src: url("assets/assets/fonts/nunito/Nunito-Bold.ttf") format("truetype"); font-display: block; }
 
-    html, body { margin: 0; height: 100%; background: #474c2b; }
+    html, body { margin: 0; height: 100%; background: var(--field); }
     #shell {
       position: fixed; inset: 0; z-index: 1; overflow: hidden;
-      background: #474c2b; color: #f4ead0;
+      background: var(--field); color: var(--cream);
       -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
     }
 
@@ -69,8 +87,8 @@
     .shell-bar, .shell-home { box-sizing: border-box; max-width: 592px; margin: 0 auto; padding: 0 16px; }
     .shell-bar { height: 62px; padding-top: 12px; --s: 0.98701; }
     .shell-mark { display: flex; flex-direction: column; align-items: flex-start; }
-    .shell-mark b { font: 400 calc(25px * var(--s))/0.9 "Lilita One", "Arial Rounded MT Bold", system-ui, sans-serif; letter-spacing: 0.035em; text-shadow: 0 calc(2px * var(--s)) 0 #1a1a18; }
-    .shell-mark i { margin-top: calc(4px * var(--s)); font: 400 calc(12px * var(--s))/1 "Black Ops One", "Lilita One", system-ui, sans-serif; font-style: normal; letter-spacing: 0.115em; color: #f45b5b; }
+    .shell-mark b { font: 400 calc(25px * var(--s))/0.9 "Lilita One", "Arial Rounded MT Bold", system-ui, sans-serif; letter-spacing: 0.035em; text-shadow: 0 calc(2px * var(--s)) 0 var(--ink); }
+    .shell-mark i { margin-top: calc(4px * var(--s)); font: 400 calc(12px * var(--s))/1 "Black Ops One", "Lilita One", system-ui, sans-serif; font-style: normal; letter-spacing: 0.115em; color: var(--coral); }
 
     .shell-home { display: none; padding-top: 12px; }
     .home .shell-home { display: block; }
@@ -79,15 +97,15 @@
       margin: 0; display: flex; flex-direction: column; align-items: flex-start;
       font: 400 47px/1.03 "Lilita One", "Arial Rounded MT Bold", system-ui, sans-serif;
       font-size: min(47px, (min(100vw, 592px) - 32px) / 6.529);
-      letter-spacing: 0.005em; white-space: nowrap; text-shadow: 0 0.0851em 0 #1a1a18;
+      letter-spacing: 0.005em; white-space: nowrap; text-shadow: 0 0.0851em 0 var(--ink);
     }
     .shell-slab {
       margin: 0.1em 0 0.2em -0.06em; padding: 0 0.2em 0.06em;
-      background: #f45b5b; color: #1a1a18; text-shadow: none;
-      border: 0.0638em solid #1a1a18; border-radius: 0.24em; box-shadow: 0 0.1064em 0 #1a1a18;
+      background: var(--coral); color: var(--ink); text-shadow: none;
+      border: 0.0638em solid var(--ink); border-radius: 0.24em; box-shadow: 0 0.1064em 0 var(--ink);
       transform: rotate(-2.5deg);
     }
-    .shell-home p { margin: 14px 0 0; max-width: 357px; font: 700 17px/1.4 "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif; color: rgba(244, 234, 208, 0.82); }
+    .shell-home p { margin: 14px 0 0; max-width: 357px; font: 700 17px/1.4 "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--cream); opacity: 0.82; }
 
     /* Desktop: an 84 px top bar, 40 px sides, and the copy in the column
        left of the sample card. */
@@ -100,8 +118,8 @@
         --copy: calc(var(--content) - var(--card) - 84px);
         padding-top: calc(30px + var(--card) * 0.18);
       }
-      .shell-home h1 { font-size: min(88px, var(--copy) / 6.529); line-height: 1; text-shadow: 0 0.0682em 0 #1a1a18; }
-      .shell-slab { border-width: 0.0455em; box-shadow: 0 0.0795em 0 #1a1a18; }
+      .shell-home h1 { font-size: min(88px, var(--copy) / 6.529); line-height: 1; text-shadow: 0 0.0682em 0 var(--ink); }
+      .shell-slab { border-width: 0.0455em; box-shadow: 0 0.0795em 0 var(--ink); }
       .shell-home p { margin-top: 26px; max-width: min(462px, var(--copy)); font-size: 21px; }
     }
   </style>

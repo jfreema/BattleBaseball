@@ -333,7 +333,7 @@ class _AuthFrame extends StatelessWidget {
                             shape: BoxShape.circle,
                             border: focused ? Border.all(color: BB.cream, width: 2) : null,
                           ),
-                          child: const Center(child: BBIcon(BBGlyph.close, size: 22, color: BB.cream)),
+                          child: Center(child: BBIcon(BBGlyph.close, size: 22, color: BB.cream)),
                         ),
                       ),
                     ),
@@ -374,7 +374,7 @@ class _ConsentState extends State<_Consent> {
   @override
   Widget build(BuildContext context) {
     final on = widget.value;
-    const link = TextStyle(
+    final link = TextStyle(
       color: BB.cream,
       decoration: TextDecoration.underline,
       decorationColor: BB.coral,
@@ -398,7 +398,7 @@ class _ConsentState extends State<_Consent> {
                   border: Border.all(color: focused ? BB.cream : BB.ink, width: 2),
                   boxShadow: BB.lip(2),
                 ),
-                child: on ? const Center(child: BBIcon(BBGlyph.check, size: 16, color: BB.ink)) : null,
+                child: on ? Center(child: BBIcon(BBGlyph.check, size: 16, color: BB.ink)) : null,
               ),
             ),
             const SizedBox(width: 12),

@@ -277,7 +277,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
               ),
           ]),
         ),
-        const _Flow([
+        _Flow([
           _Item('Spots open', Pill('11 spots left', color: BB.mint)),
           _Item('Honor', Pill('Owner', color: BB.lemon)),
           _Item('Everything else', Pill('Confirming payment')),
@@ -319,12 +319,12 @@ class _GalleryScreenState extends State<GalleryScreen> {
           RegistrationRow(_reg('waitlisted'), showEvent: false),
           Paper(
             onTap: nothing,
-            child: const Row(children: [
+            child: Row(children: [
               Expanded(child: Text('Your players')),
               BBIcon(BBGlyph.forward, color: BB.ink),
             ]),
           ),
-          const Paper(
+          Paper(
             color: BB.kraft,
             child: Row(children: [
               Expanded(child: Text('Battle Paddle')),

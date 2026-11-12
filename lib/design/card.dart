@@ -734,7 +734,7 @@ class MiniCard extends StatelessWidget {
             Container(
               width: wide ? 128 : 112,
               padding: const EdgeInsets.fromLTRB(6, 0, 6, 2),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: BB.coral,
                 border: Border(left: BorderSide(color: BB.ink, width: 2.5)),
               ),
@@ -811,7 +811,7 @@ class RuledPanel extends StatelessWidget {
               if (columns.isNotEmpty)
                 Container(
                   height: 34,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     border: Border(bottom: BorderSide(color: BB.ink, width: 1.5)),
                   ),
                   child: Row(
@@ -833,7 +833,7 @@ class RuledPanel extends StatelessWidget {
               for (final (i, child) in children.indexed)
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    border: i == 0 ? null : const Border(top: BorderSide(color: BB.inkRule, width: 1.5)),
+                    border: i == 0 ? null : Border(top: BorderSide(color: BB.inkRule, width: 1.5)),
                   ),
                   child: child,
                 ),
@@ -1077,7 +1077,7 @@ class BackFoot extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.only(top: 12),
-        decoration: const BoxDecoration(border: Border(top: BorderSide(color: BB.ink, width: 1.5))),
+        decoration: BoxDecoration(border: Border(top: BorderSide(color: BB.ink, width: 1.5))),
         child: Row(
           children: [
             Expanded(
@@ -1176,7 +1176,7 @@ class RuledTable extends StatelessWidget {
       );
     }
 
-    const rule = BorderSide(color: BB.ink, width: 1.5);
+    final rule = BorderSide(color: BB.ink, width: 1.5);
     return MediaQuery.withNoTextScaling(
       child: Container(
         decoration: BoxDecoration(
@@ -1193,7 +1193,7 @@ class RuledTable extends StatelessWidget {
                     for (var i = 0; i < n; i++)
                       DecoratedBox(
                         position: DecorationPosition.foreground,
-                        decoration: BoxDecoration(border: i == 0 ? null : const Border(top: rule)),
+                        decoration: BoxDecoration(border: i == 0 ? null : Border(top: rule)),
                         child: cell(i),
                       ),
                   ],
@@ -1206,7 +1206,7 @@ class RuledTable extends StatelessWidget {
                         flex: highlightLast && i == n - 1 ? 155 : 100,
                         child: DecoratedBox(
                           position: DecorationPosition.foreground,
-                          decoration: BoxDecoration(border: i == 0 ? null : const Border(left: rule)),
+                          decoration: BoxDecoration(border: i == 0 ? null : Border(left: rule)),
                           child: cell(i),
                         ),
                       ),

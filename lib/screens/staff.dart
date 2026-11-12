@@ -317,7 +317,7 @@ class _CheckInState extends State<_CheckIn> {
       const SizedBox(height: 14),
       TextField(
         textInputAction: TextInputAction.search,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           hintText: 'Name or number',
           prefixIcon: SizedBox(
             width: 48,
@@ -355,8 +355,8 @@ class _Check extends StatelessWidget {
         width: 30,
         height: 30,
         alignment: Alignment.center,
-        decoration: const BoxDecoration(color: BB.ink, shape: BoxShape.circle),
-        child: const BBIcon(BBGlyph.check, size: 18, color: BB.cream, semanticLabel: 'Checked in'),
+        decoration: BoxDecoration(color: BB.ink, shape: BoxShape.circle),
+        child: BBIcon(BBGlyph.check, size: 18, color: BB.cream, semanticLabel: 'Checked in'),
       );
 }
 
@@ -796,7 +796,7 @@ class _StatSheetState extends State<_StatSheet> {
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.only(top: 14, bottom: 12),
-            decoration: const BoxDecoration(border: Border(top: BorderSide(color: BB.hairline, width: 1.5))),
+            decoration: BoxDecoration(border: Border(top: BorderSide(color: BB.hairline, width: 1.5))),
             child: Text('PITCHING', style: BB.caps(13, color: BB.cream, tracking: 0.16)),
           ),
           _pair(_step('OUTS', 'outs'), _step('K', 'k')),

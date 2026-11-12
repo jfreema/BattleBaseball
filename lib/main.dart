@@ -1,6 +1,7 @@
 import 'package:battle_baseball/app.dart';
 import 'package:battle_baseball/data/demo.dart';
 import 'package:battle_baseball/data/repo.dart';
+import 'package:battle_baseball/data/scheme.dart';
 import 'package:battle_baseball/data/session.dart';
 import 'package:battle_baseball/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -19,5 +20,6 @@ Future<void> main() async {
   }
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   Session.instance; // starts listening for sign-in
+  await SchemeController.instance.start(); // the colors an admin picked
   runApp(const BattleBaseballApp());
 }

@@ -508,6 +508,33 @@ class Repo {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
+  // ---------- Color scheme ----------
+
+  /// The id of the color scheme an admin picked for everyone, or null when
+  /// none has been picked yet (the app then uses Royal Blue).
+  Stream<String?> colorScheme() => db
+      .doc('config/theme')
+      .snapshots()
+      .map((d) => d.data()?['scheme'] as String?);
+
+  /// Switches every visitor to [id], and logs who did it.
+  Future<void> saveColorScheme(String id) async {
+    final batch = db.batch();
+    batch.set(db.doc('config/theme'), {
+      'scheme': id,
+      'updatedBy': session.user!.uid,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    batch.set(db.collection('auditLogs').doc(), {
+      'action': 'colorScheme.update',
+      'by': session.user!.uid,
+      'byName': session.displayName,
+      'scheme': id,
+      'at': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
   // ---------- Payment settings and people ----------
 
   Stream<PaymentSettings> paymentSettings() => db
