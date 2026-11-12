@@ -31,6 +31,11 @@ class Session extends ChangeNotifier {
   String name = '';
   List<StaffAssignment> assignments = const [];
 
+  /// Whether users/{uid} has been read yet, and whether it exists. A new
+  /// Google account has none until it confirms 18+ on WelcomeScreen.
+  bool profileChecked = false;
+  bool hasProfile = false;
+
   bool get signedIn => user != null;
   bool get isOwner => role == 'owner';
   bool get isAdmin => role == 'owner' || role == 'admin';
@@ -52,6 +57,8 @@ class Session extends ChangeNotifier {
     role = null;
     assignments = const [];
     name = '';
+    profileChecked = false;
+    hasProfile = false;
     if (u == null) {
       ready = true;
       notifyListeners();
@@ -76,8 +83,15 @@ class Session extends ChangeNotifier {
     }, onError: (_) {});
     _userSub = db.doc('users/${u.uid}').snapshots().listen((d) {
       name = d.data()?['name'] as String? ?? '';
+      // A pending local write (email sign-up's own batch) counts as present.
+      hasProfile = d.exists;
+      profileChecked = true;
       notifyListeners();
-    }, onError: (_) {});
+    }, onError: (_) {
+      profileChecked = true;
+      hasProfile = true; // don't trap someone on WelcomeScreen over a read error
+      notifyListeners();
+    });
   }
 
   @override

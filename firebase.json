@@ -26,7 +26,11 @@
   },
   "auth": {
     "providers": {
-      "emailPassword": true
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Battle Baseball",
+        "supportEmail": "battleplan-help@googlegroups.com"
+      }
     }
   },
   "hosting": {

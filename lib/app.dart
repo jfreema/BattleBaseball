@@ -29,6 +29,10 @@ final router = GoRouter(
     if (!s.signedIn && !_isPublic(path)) {
       return Uri(path: '/sign-in', queryParameters: {'from': state.uri.toString()}).toString();
     }
+    if (s.signedIn && s.profileChecked && !s.hasProfile) {
+      return path == '/welcome' ? null : '/welcome';
+    }
+    if (path == '/welcome') return s.signedIn ? '/' : '/sign-in';
     if (s.signedIn && (path == '/sign-in' || path == '/sign-up')) {
       return state.uri.queryParameters['from'] ?? '/';
     }
@@ -109,6 +113,7 @@ final router = GoRouter(
     ),
     GoRoute(path: '/sign-in', builder: (_, _) => const SignInScreen()),
     GoRoute(path: '/sign-up', builder: (_, _) => const SignInScreen(signUp: true)),
+    GoRoute(path: '/welcome', builder: (_, _) => const WelcomeScreen()),
   ],
 );
 

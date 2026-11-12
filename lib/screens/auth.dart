@@ -1,9 +1,116 @@
 import 'package:battle_baseball/design/bb.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+/// The first stop for an account with no profile yet (a new Google sign-in):
+/// confirm 18+ and the terms, or back out and delete the account.
+class WelcomeScreen extends StatefulWidget {
+  const WelcomeScreen({super.key});
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  late final _name = TextEditingController(
+      text: FirebaseAuth.instance.currentUser?.displayName ?? '');
+  bool _adult = false;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    if (!_adult || _name.text.trim().isEmpty) {
+      toast(context, 'Add your name and confirm you are 18 or older.');
+      return;
+    }
+    setState(() => _busy = true);
+    final db = FirebaseFirestore.instance;
+    final email = (user.email ?? '').toLowerCase();
+    final name = _name.text.trim();
+    try {
+      final batch = db.batch()
+        ..set(db.doc('users/${user.uid}'), {
+          'name': name,
+          'email': email,
+          'adultConfirmed': true,
+          'termsAcceptedAt': FieldValue.serverTimestamp(),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      if (email.isNotEmpty) {
+        batch.set(db.doc('userEmails/$email'), {'uid': user.uid, 'name': name});
+      }
+      await batch.commit();
+    } catch (e) {
+      if (mounted) toast(context, "Couldn't save: $e");
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _cancel() async {
+    final user = FirebaseAuth.instance.currentUser;
+    try {
+      await user?.delete();
+    } catch (_) {}
+    await FirebaseAuth.instance.signOut();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              shrinkWrap: true,
+              children: [
+                const Center(child: Wordmark(width: 200)),
+                const SizedBox(height: 24),
+                const Eyebrow('Welcome'),
+                const Headline('One more thing', size: 32),
+                const SizedBox(height: 8),
+                const Text(
+                  'Battle Baseball accounts are for parents, guardians, and volunteers. '
+                  'Players never need their own.',
+                  style: TextStyle(color: BB.muted, fontSize: 16),
+                ),
+                const SizedBox(height: 18),
+                TextField(
+                  controller: _name,
+                  decoration: const InputDecoration(labelText: 'Your name'),
+                  textCapitalization: TextCapitalization.words,
+                ),
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  value: _adult,
+                  onChanged: (v) => setState(() => _adult = v ?? false),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text(
+                    "I'm 18 or older and agree to the Terms and Privacy Policy.",
+                    style: TextStyle(fontSize: 15),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                CandyButton(label: 'Continue', expand: true, busy: _busy, onPressed: _save),
+                const SizedBox(height: 8),
+                TextButton(onPressed: _cancel, child: const Text("Cancel, I'm not 18")),
+              ],
+            ),
+          ),
+        ),
+      );
+}
 
 /// Email sign-in and sign-up. Accounts are for adults: parents, guardians,
 /// volunteers, and admins. Players are records their parents manage.
@@ -83,6 +190,32 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
+  /// Continue with Google. A first-time Google account confirms it's an
+  /// adult and accepts the terms before its profile is saved.
+  Future<void> _google() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final auth = FirebaseAuth.instance;
+    try {
+      final provider = GoogleAuthProvider()..setCustomParameters({'prompt': 'select_account'});
+      final cred = kIsWeb
+          ? await auth.signInWithPopup(provider)
+          : await auth.signInWithProvider(provider);
+      // A first-time account goes to WelcomeScreen (the router sends it there).
+      debugPrint('Signed in with Google: ${cred.user?.uid}');
+    } on FirebaseAuthException catch (e) {
+      if (e.code != 'popup-closed-by-user' && e.code != 'cancelled-popup-request') {
+        setState(() => _error = _message(e));
+      }
+    } catch (e) {
+      setState(() => _error = 'Google sign-in did not finish. Try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _reset() async {
     final email = _email.text.trim();
     if (email.isEmpty) {
@@ -126,6 +259,25 @@ class _SignInScreenState extends State<SignInScreen> {
                 style: const TextStyle(color: BB.muted, fontSize: 16),
               ),
               const SizedBox(height: 20),
+              CandyButton(
+                label: 'Continue with Google',
+                icon: Icons.account_circle,
+                face: Colors.white,
+                fg: const Color(0xFF1F1F1F),
+                edge: BB.ink,
+                expand: true,
+                onPressed: _busy ? null : _google,
+              ),
+              const SizedBox(height: 18),
+              const Row(children: [
+                Expanded(child: Divider()),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('or use email', style: TextStyle(color: BB.muted)),
+                ),
+                Expanded(child: Divider()),
+              ]),
+              const SizedBox(height: 18),
               Form(
                 key: _form,
                 child: AutofillGroup(
