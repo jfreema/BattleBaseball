@@ -2,8 +2,10 @@
 # hand (Actions > Deploy > Run workflow); deploying from a PC with the
 # Firebase CLI is the usual way, and this saves Actions minutes.
 #
-# Needs one repository secret, FIREBASE_SERVICE_ACCOUNT: a JSON key for a
-# service account in battlebaseball-prod. The README says how to make it.
+# Signs in to Google Cloud with workload identity federation, so there is no
+# key or secret: GitHub vouches for this repo's main branch, and Google lets
+# that act as the github-deploy service account. The README has the one-time
+# setup.
 name: Deploy
 
 on:
@@ -21,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: deploy
@@ -59,7 +62,8 @@ jobs:
 
       - uses: google-github-actions/auth@v3
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          workload_identity_provider: projects/32593350512/locations/global/workloadIdentityPools/github/providers/battlebaseball
+          service_account: github-deploy@battlebaseball-prod.iam.gserviceaccount.com
 
       - name: Deploy
         env:
