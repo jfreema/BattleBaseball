@@ -6,7 +6,6 @@ import 'package:battle_baseball/screens/common.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
@@ -113,14 +112,22 @@ class _AccountView extends StatelessWidget {
         ],
         if (signedIn) _Row('Your players', onTap: () => context.go('/players')),
         if (staff) _Row('Staff tools', onTap: () => context.go('/admin')),
-        _Row('Host a Showcase', onTap: () => context.go('/host')),
+        _Row(
+          'Host a Showcase',
+          sub: 'Help run one to raise money for your team',
+          onTap: () => context.go('/host'),
+        ),
         _Row(
           'Battleplan',
           sub: 'Free team chat and schedules',
           trailing: BBIcon(BBGlyph.external, size: 20, color: BB.ink),
-          onTap: () => launchUrl(Uri.parse('https://getbattleplan.app')),
+          onTap: openBattleplan,
         ),
-        const _Row('Battle Paddle', trailing: Pill('Coming soon')),
+        const _Row(
+          'Battle Paddle',
+          sub: 'Swing training tool for elite mechanics',
+          trailing: Pill('Coming soon'),
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 22,

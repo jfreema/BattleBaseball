@@ -139,6 +139,7 @@ class _EventsView extends StatelessWidget {
       children: [
         const TabHeader(),
         const PageTitle('Showcases'),
+        const _ParentsLine(),
         if (all == null)
           const LoadingField()
         else ...[
@@ -154,6 +155,46 @@ class _EventsView extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Under the title: where parents hear from coaches once teams are set.
+class _ParentsLine extends StatefulWidget {
+  const _ParentsLine();
+
+  @override
+  State<_ParentsLine> createState() => _ParentsLineState();
+}
+
+class _ParentsLineState extends State<_ParentsLine> {
+  final _tap = TapGestureRecognizer()..onTap = openBattleplan;
+
+  @override
+  void dispose() {
+    _tap.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 18),
+        child: Text.rich(
+          TextSpan(children: [
+            const TextSpan(text: 'Once teams are assigned, coaches talk with parents on '),
+            TextSpan(
+              text: 'Battleplan',
+              recognizer: _tap,
+              mouseCursor: SystemMouseCursors.click,
+              style: BB.labelStyle(16, height: 1.45).copyWith(
+                decoration: TextDecoration.underline,
+                decorationColor: BB.coral,
+                decorationThickness: 2.5,
+              ),
+            ),
+            const TextSpan(text: '.'),
+          ]),
+          style: BB.bodyStyle(16, height: 1.45),
+        ),
+      );
 }
 
 /// A ticket in the list. While registration is open it counts the spots

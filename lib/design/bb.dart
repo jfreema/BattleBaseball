@@ -55,6 +55,9 @@ abstract final class BB {
   /// Where the static pages (privacy, terms, waiver, support) live.
   static const site = 'https://showcase.getbattleplan.app';
 
+  /// Battleplan, the team chat app coaches use with parents.
+  static const battleplan = 'https://getbattleplan.app';
+
   static const display = 'Lilita One';
   static const stencil = 'Black Ops One';
   static const label = 'Fredoka';
@@ -445,6 +448,25 @@ abstract final class BB {
 Future<void> openSitePage(String path) {
   final uri = kIsWeb ? Uri.base.resolve(path) : Uri.parse('${BB.site}$path');
   return launchUrl(uri);
+}
+
+Future<void> openBattleplan() => launchUrl(Uri.parse(BB.battleplan));
+
+/// "Powered by Battleplan", for the bottom of a page.
+class PoweredBy extends StatelessWidget {
+  const PoweredBy({super.key, this.size = 14});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+        spacing: 5,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text('Powered by', style: BB.bodyStyle(size - 0.5, height: 1)),
+          TextLink('Battleplan', size: size, onTap: openBattleplan),
+        ],
+      );
 }
 
 /// Wraps a shape and paints a hard ink lip under it, for Material widgets

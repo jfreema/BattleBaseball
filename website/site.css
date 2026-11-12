@@ -81,6 +81,8 @@ strong { font-weight: 900; }
 /* The rule is as wide as the column, not the screen. */
 .foot::before { content: ""; flex: 0 0 100%; margin-bottom: 10px; border-top: 2px dashed var(--ink); }
 .foot a { display: inline-flex; align-items: center; min-height: 44px; }
+.foot .powered { flex: 0 0 100%; margin: 0; font: 600 14px/1 var(--body); color: var(--ink2); }
+.foot .powered a { color: var(--ink); }
 /* The footer links the other pages, not the one you are on. */
 [data-page="/privacy"] .foot [href="/privacy"],
 [data-page="/terms"] .foot [href="/terms"],

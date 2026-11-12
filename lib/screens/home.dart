@@ -189,7 +189,7 @@ class _HomeView extends StatelessWidget {
         if (players != null) ...[
           SizedBox(height: wide ? 64 : 44),
           const _HostLine(),
-          if (wide) const _Footer(),
+          if (wide) const _Footer() else const PoweredBy(),
         ],
       ],
     );
@@ -650,6 +650,8 @@ class _Footer extends StatelessWidget {
             const SizedBox(width: 24),
             TextLink('Support', size: 14, onTap: () => openSitePage('/support')),
             const Spacer(),
+            const PoweredBy(),
+            const SizedBox(width: 24),
             Text('© 2026 Battle Baseball', style: BB.bodyStyle(13.5, height: 1)),
           ],
         ),
