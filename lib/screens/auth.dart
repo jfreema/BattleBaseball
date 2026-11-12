@@ -278,8 +278,12 @@ class _SignInScreenState extends State<SignInScreen> {
         const SizedBox(height: 16),
         BBButton.primary(title, expand: true, busy: _busy, onPressed: _submit),
         const SizedBox(height: 12),
-        BBButton.paper('Continue with Google', expand: true, onPressed: _google),
-        const SizedBox(height: 12),
+        // Not on iPhone: the App Store asks for Sign in with Apple beside any
+        // other sign-in service, so the iOS app keeps to email for now.
+        if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) ...[
+          BBButton.paper('Continue with Google', expand: true, onPressed: _google),
+          const SizedBox(height: 12),
+        ],
         Wrap(
           spacing: 22,
           children: [

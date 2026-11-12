@@ -17,6 +17,10 @@ class Repo {
 
   /// True while the app is showing sample data instead of Firestore.
   static bool get isDemo => instance.demo;
+
+  /// True when sample data should wear its SAMPLE DATA stamp: always, except
+  /// in App Store screenshot builds (--dart-define=SCREENSHOTS=true).
+  static bool get stampDemo => isDemo && !const bool.fromEnvironment('SCREENSHOTS');
   bool get demo => false;
 
   FirebaseFirestore get db => FirebaseFirestore.instance;
@@ -608,4 +612,27 @@ class Repo {
       });
 
   Future<void> removeStaff(String id) => staff.doc(id).delete();
+
+  // ---------- Deleting an account ----------
+
+  /// Deletes what the signed-in account owns: each of its players (the
+  /// public profile, the private details, then the player), its profile and
+  /// its email lookup. The caller deletes the sign-in itself afterward.
+  /// Registrations and published results stay with the event; results show
+  /// no name once the player is gone.
+  Future<void> deleteMyData() async {
+    final user = session.user;
+    if (user == null) return;
+    final mine = await players.where('guardianUids', arrayContains: user.uid).get();
+    for (final p in mine.docs) {
+      final batch = db.batch()
+        ..delete(publicProfiles.doc(p.id))
+        ..delete(db.doc('playerPrivate/${p.id}'))
+        ..delete(p.reference);
+      await batch.commit();
+    }
+    final email = (user.email ?? '').toLowerCase();
+    if (email.isNotEmpty) await db.doc('userEmails/$email').delete();
+    await db.doc('users/${user.uid}').delete();
+  }
 }

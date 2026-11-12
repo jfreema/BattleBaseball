@@ -42,6 +42,8 @@ service cloud.firestore {
       allow create, update: if signedIn() && me() == userId
         && request.resource.data.keys().hasOnly(
              ['name', 'email', 'phone', 'adultConfirmed', 'termsAcceptedAt', 'createdAt']);
+      // Account > Delete account.
+      allow delete: if signedIn() && me() == userId;
     }
 
     // Lets an admin add someone by the exact email they signed up with.
@@ -49,6 +51,7 @@ service cloud.firestore {
       allow get: if signedIn();
       allow create, update: if signedIn() && request.resource.data.uid == me()
         && email == request.auth.token.email;
+      allow delete: if signedIn() && resource.data.uid == me();
     }
 
     match /roles/{userId} {

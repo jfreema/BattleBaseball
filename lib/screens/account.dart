@@ -1,9 +1,11 @@
 // Account: who is signed in, the few places only they go, and the links to
 // the static pages.
+import 'package:battle_baseball/data/repo.dart';
 import 'package:battle_baseball/data/session.dart';
 import 'package:battle_baseball/design/bb.dart';
 import 'package:battle_baseball/screens/common.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -137,9 +139,17 @@ class _AccountView extends StatelessWidget {
               ('Privacy', '/privacy'),
               ('Terms', '/terms'),
               ('Waiver', '/waiver'),
-              ('Delete account', '/delete-account'),
             ])
               TextLink(label, size: 15, onTap: () => openSitePage(path)),
+            // Signed in, the account is deleted right here (the App Store
+            // requires it). Signed out, the page says how.
+            TextLink(
+              'Delete account',
+              size: 15,
+              onTap: signedIn
+                  ? () => showDialog<void>(context: context, builder: (_) => const _DeleteAccount())
+                  : () => openSitePage('/delete-account'),
+            ),
           ],
         ),
         if (signedIn) ...[
@@ -198,5 +208,123 @@ class _Row extends StatelessWidget {
             ),
           ),
         ),
+      );
+}
+
+/// Deletes the signed-in account: its players, their private details and
+/// public cards, its profile, and the sign-in itself. An email account
+/// confirms with its password first, since Firebase only deletes a sign-in
+/// that was used recently.
+class _DeleteAccount extends StatefulWidget {
+  const _DeleteAccount();
+  @override
+  State<_DeleteAccount> createState() => _DeleteAccountState();
+}
+
+class _DeleteAccountState extends State<_DeleteAccount> {
+  final _password = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  User? get _user => FirebaseAuth.instance.currentUser;
+  bool get _usesPassword => _user?.providerData.any((p) => p.providerId == 'password') ?? false;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reauthenticate(User user) async {
+    if (_usesPassword) {
+      await user.reauthenticateWithCredential(
+        EmailAuthProvider.credential(email: user.email ?? '', password: _password.text),
+      );
+    } else if (kIsWeb) {
+      await user.reauthenticateWithPopup(GoogleAuthProvider());
+    } else {
+      await user.reauthenticateWithProvider(GoogleAuthProvider());
+    }
+  }
+
+  Future<void> _delete() async {
+    if (_busy) return;
+    if (Repo.isDemo) {
+      setState(() => _error = 'This is sample data. Nothing was deleted.');
+      return;
+    }
+    final user = _user;
+    if (user == null) return;
+    if (_usesPassword && _password.text.isEmpty) {
+      setState(() => _error = 'Enter your password.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await _reauthenticate(user);
+      await Repo.instance.deleteMyData();
+      await user.delete();
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+      final router = GoRouter.of(context);
+      toast(context, 'Your account was deleted.');
+      Navigator.of(context).pop();
+      router.go('/');
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = switch (e.code) {
+            'wrong-password' || 'invalid-credential' => "That password isn't right.",
+            'too-many-requests' => 'Too many tries. Wait a minute and try again.',
+            _ => "Couldn't delete the account. Try again.",
+          });
+    } catch (e) {
+      debugPrint('Deleting the account failed: $e');
+      if (mounted) setState(() => _error = "Couldn't delete the account. Try again.");
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Delete your account?'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This deletes your account, your players, their private details, and their '
+                "player cards. It can't be undone. Results already published stay on past "
+                "showcases without your player's name.",
+              ),
+              if (_usesPassword) ...[
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _password,
+                  obscureText: true,
+                  autofillHints: const [AutofillHints.password],
+                  decoration: const InputDecoration(labelText: 'Your password'),
+                  onSubmitted: (_) => _delete(),
+                ),
+              ],
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Semantics(
+                    liveRegion: true,
+                    child: Text(_error!, style: BB.labelStyle(15, color: BB.coral, height: 1.3)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          BBButton.paper('Cancel', small: true, onPressed: () => Navigator.of(context).pop()),
+          BBButton.primary('Delete account', small: true, busy: _busy, onPressed: _delete),
+        ],
       );
 }

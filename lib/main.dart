@@ -13,7 +13,10 @@ Future<void> main() async {
   usePathUrlStrategy();
   // ?demo=1 shows the app filled with sample data, for design review.
   // ?demo=family and ?demo=staff add a pretend sign-in on top of it.
-  final demo = Uri.base.queryParameters['demo'];
+  // The iOS and Android apps have no URL, so screenshot builds pass
+  // --dart-define=DEMO=1 (or family, or staff) instead.
+  const demoDefine = String.fromEnvironment('DEMO');
+  final demo = Uri.base.queryParameters['demo'] ?? (demoDefine.isEmpty ? null : demoDefine);
   if (demo == '1' || demo == 'family' || demo == 'staff') {
     Repo.instance = DemoRepo();
     if (demo != '1') Session.demoAs = demo;

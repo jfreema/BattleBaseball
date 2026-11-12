@@ -253,7 +253,7 @@ class _TopBar extends StatelessWidget {
                     color: BB.hairline,
                   ),
                   Text('BATON ROUGE, LA', style: BB.caps(13)),
-                  if (Repo.isDemo) ...[const SizedBox(width: 22), const Stamp('SAMPLE DATA')],
+                  if (Repo.stampDemo) ...[const SizedBox(width: 22), const Stamp('SAMPLE DATA')],
                   const Spacer(),
                   Semantics(
                     container: true,

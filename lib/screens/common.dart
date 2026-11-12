@@ -161,7 +161,7 @@ class TabHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     if (BB.isWide(context)) return const SizedBox(height: 12);
     // Sample data says so in place of whatever else would sit here.
-    final right = Repo.isDemo ? const Stamp('SAMPLE DATA') : trailing;
+    final right = Repo.stampDemo ? const Stamp('SAMPLE DATA') : trailing;
     return SizedBox(
       height: 62,
       child: Row(
@@ -227,7 +227,7 @@ class BackHeader extends StatelessWidget {
       ),
     );
     // Sample data says so at the right, as the tab screens do.
-    final right = trailing ?? (Repo.isDemo && !BB.isWide(context) ? const Stamp('SAMPLE DATA') : null);
+    final right = trailing ?? (Repo.stampDemo && !BB.isWide(context) ? const Stamp('SAMPLE DATA') : null);
     return SizedBox(
       height: BB.isWide(context) ? 48 : 62,
       child: Row(

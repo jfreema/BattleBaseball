@@ -593,4 +593,6 @@ class DemoRepo extends Repo {
   Future<void> assignStaff(String eventId, AppUser u, String role) => _no();
   @override
   Future<void> removeStaff(String id) => _no();
+  @override
+  Future<void> deleteMyData() => _no();
 }
