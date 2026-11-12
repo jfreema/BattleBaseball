@@ -87,6 +87,17 @@ firebase deploy --only hosting,firestore
 
 There's no dev environment yet: this deploys straight to production.
 
+### Deploying from GitHub
+
+Deploying from a PC is the usual way. The **Deploy** workflow does the same build and deploy on GitHub, but only when started by hand: Actions > Deploy > Run workflow, then pick the site and database rules, the site only, the rules only, or a preview link that expires in a week. It never runs on push.
+
+It needs a repository secret named `FIREBASE_SERVICE_ACCOUNT` holding a service account key. One-time setup:
+
+1. In the Google Cloud console for `battlebaseball-prod`, go to IAM & Admin > Service accounts and create one named `github-deploy`.
+2. Give it these roles: Firebase Hosting Admin, Firebase Rules Admin, Cloud Datastore Index Admin, Service Usage Consumer, and API Keys Viewer.
+3. Open the account, go to Keys > Add key > Create new key > JSON, and download it.
+4. In the GitHub repo, go to Settings > Secrets and variables > Actions > New repository secret. Name it `FIREBASE_SERVICE_ACCOUNT` and paste the whole JSON file as the value. Then delete the downloaded file.
+
 ## Not built yet
 
 Push notifications and the 24-hour hold timer on the server (both need Cloud Functions and the Blaze plan), Facebook share previews for event and player pages, Sign in with Apple, photo uploads, pitch counts, team placement, host payouts, the Battle Paddle shop, and store builds for iOS and Android.

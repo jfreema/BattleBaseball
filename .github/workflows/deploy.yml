@@ -1,0 +1,74 @@
+# Builds the app and deploys it to Firebase. It only runs when started by
+# hand (Actions > Deploy > Run workflow); deploying from a PC with the
+# Firebase CLI is the usual way, and this saves Actions minutes.
+#
+# Needs one repository secret, FIREBASE_SERVICE_ACCOUNT: a JSON key for a
+# service account in battlebaseball-prod. The README says how to make it.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      what:
+        description: What to deploy
+        type: choice
+        default: Site and database rules
+        options:
+          - Site and database rules
+          - Site only
+          - Database rules only
+          - Preview link (not live)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PROJECT: battlebaseball-prod
+      FIREBASE_TOOLS: firebase-tools@15.36.0
+      NEEDS_SITE: ${{ inputs.what != 'Database rules only' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+
+      - uses: subosito/flutter-action@v2
+        if: env.NEEDS_SITE == 'true'
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+
+      - name: Check and build the app
+        if: env.NEEDS_SITE == 'true'
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build web --release
+          node tools/build_hosting.mjs
+
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy
+        env:
+          WHAT: ${{ inputs.what }}
+        run: |
+          case "$WHAT" in
+            "Site and database rules") npx --yes "$FIREBASE_TOOLS" deploy --only hosting,firestore --project "$PROJECT" --non-interactive ;;
+            "Site only")               npx --yes "$FIREBASE_TOOLS" deploy --only hosting --project "$PROJECT" --non-interactive ;;
+            "Database rules only")     npx --yes "$FIREBASE_TOOLS" deploy --only firestore --project "$PROJECT" --non-interactive ;;
+            "Preview link (not live)") npx --yes "$FIREBASE_TOOLS" hosting:channel:deploy preview --expires 7d --project "$PROJECT" --non-interactive ;;
+            *) echo "Unknown choice: $WHAT"; exit 1 ;;
+          esac
