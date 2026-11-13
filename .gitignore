@@ -50,3 +50,4 @@ app.*.map.json
 # Firebase CLI
 .firebase/
 *.log
+tools/seed/node_modules/
