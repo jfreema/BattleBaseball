@@ -651,16 +651,31 @@ class Repo {
   Future<void> deleteMyData() async {
     final user = session.user;
     if (user == null) return;
+    // One document at a time, each only if it's still there: a batch is
+    // refused whole if any rule in it can't be evaluated, and a delete that
+    // was cut short can then simply be run again.
+    Future<void> deleteIfThere(DocumentReference<Json> ref) async {
+      final DocumentSnapshot<Json> snap;
+      try {
+        snap = await ref.get();
+      } on FirebaseException catch (e) {
+        // The rules can't read a document that isn't there.
+        if (e.code == 'permission-denied') return;
+        rethrow;
+      }
+      if (snap.exists) await ref.delete();
+    }
+
     final mine = await players.where('guardianUids', arrayContains: user.uid).get();
     for (final p in mine.docs) {
-      final batch = db.batch()
-        ..delete(publicProfiles.doc(p.id))
-        ..delete(db.doc('playerPrivate/${p.id}'))
-        ..delete(p.reference);
-      await batch.commit();
+      // The public card and private details go first: their rules look the
+      // player up.
+      await deleteIfThere(publicProfiles.doc(p.id));
+      await deleteIfThere(db.doc('playerPrivate/${p.id}'));
+      await p.reference.delete();
     }
     final email = (user.email ?? '').toLowerCase();
-    if (email.isNotEmpty) await db.doc('userEmails/$email').delete();
-    await db.doc('users/${user.uid}').delete();
+    if (email.isNotEmpty) await deleteIfThere(db.doc('userEmails/$email'));
+    await deleteIfThere(db.doc('users/${user.uid}'));
   }
 }

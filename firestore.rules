@@ -15,15 +15,17 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
     function me() { return request.auth.uid; }
-    function doc(path) { return /databases/$(database)/documents/$(path); }
+    // A document's path. Collection and id go in separately: a slash inside
+    // one $( ) segment would be read as part of the id, not a separator.
+    function doc(coll, id) { return /databases/$(database)/documents/$(coll)/$(id); }
 
     function roleOf() {
-      return exists(doc('roles/' + me())) ? get(doc('roles/' + me())).data.role : '';
+      return exists(doc('roles', me())) ? get(doc('roles', me())).data.role : '';
     }
     function isOwner() { return signedIn() && roleOf() == 'owner'; }
     function isAdmin() { return signedIn() && roleOf() in ['owner', 'admin']; }
 
-    function staffDoc(eventId) { return doc('staffAssignments/' + eventId + '_' + me()); }
+    function staffDoc(eventId) { return doc('staffAssignments', eventId + '_' + me()); }
     function isEventStaff(eventId) {
       return isAdmin() || (signedIn() && exists(staffDoc(eventId)));
     }
@@ -103,16 +105,16 @@ service cloud.firestore {
     }
 
     function parentTakesSpot(divisionId) {
-      let reg = 'registrations/' + request.resource.data.lastReg;
+      let reg = doc('registrations', request.resource.data.lastReg);
       return signedIn()
         && onlyChanges(['taken', 'lastReg'])
         && request.resource.data.taken == resource.data.taken + 1
         && request.resource.data.taken <= resource.data.capacity
-        && (!exists(doc(reg)) || get(doc(reg)).data.status in ['released', 'cancelled'])
-        && existsAfter(doc(reg))
-        && getAfter(doc(reg)).data.guardianUid == me()
-        && getAfter(doc(reg)).data.divisionId == divisionId
-        && getAfter(doc(reg)).data.status == 'held';
+        && (!exists(reg) || get(reg).data.status in ['released', 'cancelled'])
+        && existsAfter(reg)
+        && getAfter(reg).data.guardianUid == me()
+        && getAfter(reg).data.divisionId == divisionId
+        && getAfter(reg).data.status == 'held';
     }
 
     // ---------- Players ----------
@@ -128,8 +130,8 @@ service cloud.firestore {
     }
 
     function guardianOf(playerId) {
-      return signedIn() && exists(doc('players/' + playerId))
-        && me() in get(doc('players/' + playerId)).data.guardianUids;
+      return signedIn() && exists(doc('players', playerId))
+        && me() in get(doc('players', playerId)).data.guardianUids;
     }
 
     // A player's public profile: the display name the guardian chose, grad
@@ -137,7 +139,7 @@ service cloud.firestore {
     // the same batch that switches the profile on (so the rule reads the
     // player as it will be) and deletes it when they switch it off.
     function validPublicProfile(playerId) {
-      let p = getAfter(doc('players/' + playerId)).data;
+      let p = getAfter(doc('players', playerId)).data;
       return signedIn()
         && me() in p.guardianUids
         && p.publicProfile == true
@@ -156,7 +158,7 @@ service cloud.firestore {
     // those two fields on the player's registrations and results, and only
     // to what the player record now says.
     function guardianSetsVisibility() {
-      let p = get(doc('players/' + resource.data.playerId)).data;
+      let p = get(doc('players', resource.data.playerId)).data;
       return signedIn()
         && onlyChanges(['publicName', 'playerPublic'])
         && me() in p.guardianUids
@@ -180,9 +182,9 @@ service cloud.firestore {
         && r.guardianUid == me()
         && regId == r.eventId + '_' + r.playerId
         && r.status in ['held', 'waitlisted']
-        && exists(doc('players/' + r.playerId))
-        && me() in get(doc('players/' + r.playerId)).data.guardianUids
-        && get(doc('events/' + r.eventId)).data.status == 'open';
+        && exists(doc('players', r.playerId))
+        && me() in get(doc('players', r.playerId)).data.guardianUids
+        && get(doc('events', r.eventId)).data.status == 'open';
     }
 
     match /registrations/{regId} {

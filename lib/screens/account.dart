@@ -255,6 +255,7 @@ class _DeleteAccountState extends State<_DeleteAccount> {
 
   Future<void> _delete() async {
     if (_busy) return;
+    FocusScope.of(context).unfocus();
     if (Repo.isDemo) {
       setState(() => _error = 'This is sample data. Nothing was deleted.');
       return;
@@ -271,15 +272,26 @@ class _DeleteAccountState extends State<_DeleteAccount> {
     });
     try {
       await _reauthenticate(user);
-      await Repo.instance.deleteMyData();
-      await user.delete();
-      await FirebaseAuth.instance.signOut();
       if (!mounted) return;
+      // The password checks out, so close this dialog now: deleting the
+      // profile sends the app to another screen, which would take an open
+      // dialog with it (and a later pop would take the page underneath).
       final router = GoRouter.of(context);
-      toast(context, 'Your account was deleted.');
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
+      String done = 'Your account was deleted.';
+      try {
+        await Repo.instance.deleteMyData();
+        await user.delete();
+      } catch (e) {
+        debugPrint('Deleting the account failed: $e');
+        done = "Couldn't finish deleting your account. Sign in and try Delete account again.";
+      }
+      await FirebaseAuth.instance.signOut();
       router.go('/');
+      messenger.showSnackBar(SnackBar(content: Text(done)));
     } on FirebaseAuthException catch (e) {
+      debugPrint('Deleting the account failed: ${e.code} ${e.message}');
       if (!mounted) return;
       setState(() => _error = switch (e.code) {
             'wrong-password' || 'invalid-credential' => "That password isn't right.",

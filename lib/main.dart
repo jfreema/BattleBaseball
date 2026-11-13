@@ -4,6 +4,8 @@ import 'package:battle_baseball/data/repo.dart';
 import 'package:battle_baseball/data/scheme.dart';
 import 'package:battle_baseball/data/session.dart';
 import 'package:battle_baseball/firebase_options.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:material_ui/material_ui.dart';
@@ -22,6 +24,11 @@ Future<void> main() async {
     if (demo != '1') Session.demoAs = demo;
   }
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Local testing against the Firebase emulators (--dart-define=EMULATOR=true).
+  if (const bool.fromEnvironment('EMULATOR')) {
+    await FirebaseAuth.instance.useAuthEmulator('localhost', 9199);
+    FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8181);
+  }
   Session.instance; // starts listening for sign-in
   await SchemeController.instance.start(); // the colors an admin picked
   runApp(const BattleBaseballApp());
