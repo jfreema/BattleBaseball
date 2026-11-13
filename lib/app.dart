@@ -12,6 +12,7 @@ import 'package:battle_baseball/screens/gallery.dart';
 import 'package:battle_baseball/screens/home.dart';
 import 'package:battle_baseball/screens/host.dart';
 import 'package:battle_baseball/screens/leaderboards.dart';
+import 'package:battle_baseball/screens/merch.dart';
 import 'package:battle_baseball/screens/players.dart';
 import 'package:battle_baseball/screens/staff.dart';
 import 'package:go_router/go_router.dart';
@@ -100,6 +101,7 @@ final router = GoRouter(
         GoRoute(path: '/leaders', builder: (_, _) => const LeaderboardsScreen()),
         GoRoute(path: '/leaderboards', redirect: (_, _) => '/leaders'),
         GoRoute(path: '/host', builder: (_, _) => const HostScreen()),
+        GoRoute(path: '/merch', builder: (_, _) => const MerchScreen()),
         GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
         GoRoute(path: '/more', redirect: (_, _) => '/account'),
         GoRoute(

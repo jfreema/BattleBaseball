@@ -449,6 +449,34 @@ class Repo {
         return list;
       });
 
+  /// Home runs across published showcases, one row per public player, most
+  /// first. Each row is a stand-in Measurement of type 'homeRuns'.
+  Stream<List<Measurement>> homeRunLeaders() => statLines
+      .where('published', isEqualTo: true)
+      .where('playerPublic', isEqualTo: true)
+      .snapshots()
+      .map((s) => totalHomeRuns(s.docs.map(StatLine.fromDoc)));
+
+  /// Adds up each public player's home runs; players with none are left off.
+  static List<Measurement> totalHomeRuns(Iterable<StatLine> lines) {
+    final rows = <String, Measurement>{};
+    for (final l in lines) {
+      if (l.publicName.isEmpty || l.hr <= 0) continue;
+      final cur = rows[l.playerId];
+      rows[l.playerId] = Measurement(
+        id: l.playerId,
+        eventId: l.eventId,
+        playerId: l.playerId,
+        publicName: l.publicName,
+        gradYear: l.gradYear,
+        type: 'homeRuns',
+        value: (cur?.value ?? 0) + l.hr,
+        published: true,
+      );
+    }
+    return rows.values.toList()..sort((a, b) => b.value.compareTo(a.value));
+  }
+
   /// A player's own results (guardians and staff).
   Stream<List<Measurement>> playerMeasurements(String playerId) => measurements
       .where('playerId', isEqualTo: playerId)

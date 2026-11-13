@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "demo": "node demo.mjs"
+    "demo": "node demo.mjs",
+    "showcase": "node showcase.mjs"
   },
   "dependencies": {
     "firebase-admin": "^14.5.0"

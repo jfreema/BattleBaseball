@@ -10,6 +10,7 @@ import 'package:battle_baseball/design/bb.dart';
 import 'package:battle_baseball/design/card.dart';
 import 'package:battle_baseball/design/ticket.dart';
 import 'package:battle_baseball/screens/common.dart';
+import 'package:battle_baseball/screens/merch.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -187,6 +188,11 @@ class _HomeView extends StatelessWidget {
             for (final (i, section) in lower.indexed) ...[if (i > 0) const SizedBox(height: 48), section],
         ],
         if (players != null) ...[
+          SizedBox(height: wide ? 64 : 48),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: wide ? 524 : double.infinity),
+            child: const MerchSection(),
+          ),
           SizedBox(height: wide ? 64 : 44),
           const _HostLine(),
           if (wide) const _Footer() else const PoweredBy(),

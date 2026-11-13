@@ -125,6 +125,12 @@ class _AccountView extends StatelessWidget {
           trailing: BBIcon(BBGlyph.external, size: 20, color: BB.ink),
           onTap: openBattleplan,
         ),
+        _Row(
+          'Merch',
+          sub: 'Battle Baseball tees',
+          trailing: const Pill('Coming soon'),
+          onTap: () => context.go('/merch'),
+        ),
         const _Row(
           'Battle Paddle',
           sub: 'Swing training tool for elite mechanics',

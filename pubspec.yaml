@@ -1,7 +1,7 @@
 name: battle_baseball
 description: "Battle Baseball: youth baseball player showcases."
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+4
 
 environment:
   sdk: ^3.14.0
@@ -32,6 +32,7 @@ flutter:
   # stencil eyebrows, Fredoka labels and buttons, Nunito body text. Each is
   # SIL OFL 1.1; the licenses ship beside them.
   assets:
+    - assets/merch/
     - assets/fonts/lilita_one/OFL.txt
     - assets/fonts/fredoka/OFL.txt
     - assets/fonts/nunito/OFL.txt

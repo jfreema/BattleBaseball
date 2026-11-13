@@ -14,8 +14,11 @@ String fmtTime(DateTime? d) => d == null ? '' : DateFormat('h:mm a').format(d);
 String fmtPrice(num? p) => p == null
     ? 'Price coming soon'
     : NumberFormat.simpleCurrency(decimalDigits: p % 1 == 0 ? 0 : 2).format(p);
-String fmtValue(double v, String type) =>
-    type == 'fastball' ? v.toStringAsFixed(v % 1 == 0 ? 0 : 1) : v.toStringAsFixed(2);
+String fmtValue(double v, String type) => switch (type) {
+      'homeRuns' => v.toStringAsFixed(0),
+      'fastball' => v.toStringAsFixed(v % 1 == 0 ? 0 : 1),
+      _ => v.toStringAsFixed(2),
+    };
 
 /// The hold's end, said gently: "until 4:05 PM" today, or with the day.
 String holdUntil(DateTime? end) {

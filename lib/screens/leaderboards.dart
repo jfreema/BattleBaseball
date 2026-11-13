@@ -14,6 +14,7 @@ import 'package:material_ui/material_ui.dart';
 /// The boards in the order their chips appear, and what each is called.
 const _boards = <String, String>{
   'fastball': 'Fastball',
+  'homeRuns': 'Home run',
   'popTime': 'Pop time',
   'dash40': '40 yard',
 };
@@ -43,7 +44,8 @@ class _LeaderboardsScreenState extends State<LeaderboardsScreen> {
   void initState() {
     super.initState();
     for (final type in _boards.keys) {
-      _subs.add(Repo.instance.leaderboard(type).listen(
+      final board = type == 'homeRuns' ? Repo.instance.homeRunLeaders() : Repo.instance.leaderboard(type);
+      _subs.add(board.listen(
             (list) => _put(type, list),
             // A board that can't be read is an empty board.
             onError: (Object _) => _put(type, _readings[type] ?? const []),
@@ -138,7 +140,7 @@ class _LeadersView extends StatelessWidget {
       for (final m in all)
         if (year == null || m.gradYear == year) m,
     ].take(_places).toList();
-    final unit = measurementTypes[board]?.unit ?? '';
+    final unit = board == 'homeRuns' ? 'HR' : measurementTypes[board]?.unit ?? '';
     void open(Measurement m) => context.go('/players/${m.playerId}');
 
     return PageFrame(
@@ -158,7 +160,7 @@ class _LeadersView extends StatelessWidget {
               label: 'Board',
               child: ChipRow(children: [
                 for (final t in live)
-                  BBChip(_boards[t]!, selected: t == board, onTap: () => onType(t)),
+                  BBChip(t == 'homeRuns' ? 'Home runs' : _boards[t]!, selected: t == board, onTap: () => onType(t)),
               ]),
             ),
             const SizedBox(height: 4),

@@ -448,6 +448,9 @@ class DemoRepo extends Repo {
   Stream<List<Award>> publishedAwards(String eventId) => eventAwards(eventId);
 
   @override
+  Stream<List<Measurement>> homeRunLeaders() => Stream.value(Repo.totalHomeRuns(_statLines));
+
+  @override
   Stream<List<Measurement>> leaderboard(String type) {
     final lower = measurementTypes[type]?.lowerIsBetter ?? false;
     final best = <String, Measurement>{};
