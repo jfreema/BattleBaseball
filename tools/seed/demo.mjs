@@ -21,6 +21,8 @@ if (password.length < 12) {
   process.exit(1);
 }
 
+// A gcloud user sign-in needs a quota project for the Auth admin API.
+process.env.GOOGLE_CLOUD_QUOTA_PROJECT ||= projectId;
 initializeApp({ projectId, credential: applicationDefault() });
 const auth = getAuth();
 const db = getFirestore();
