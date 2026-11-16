@@ -189,10 +189,12 @@ class _HomeView extends StatelessWidget {
         ],
         if (players != null) ...[
           SizedBox(height: wide ? 64 : 48),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: wide ? 524 : double.infinity),
-            child: const MerchSection(),
-          ),
+          // Half the page on desktop, in the same columns as the sections
+          // above it.
+          if (wide)
+            const _Grid(columns: 2, gap: 72, runGap: 0, children: [MerchSection(), SizedBox.shrink()])
+          else
+            const MerchSection(),
           SizedBox(height: wide ? 64 : 44),
           const _HostLine(),
           if (wide) const _Footer() else const PoweredBy(),

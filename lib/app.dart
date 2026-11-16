@@ -2,6 +2,7 @@ import 'dart:ui' show PointerDeviceKind;
 
 import 'package:battle_baseball/data/repo.dart';
 import 'package:battle_baseball/data/session.dart';
+import 'package:battle_baseball/data/shop.dart';
 import 'package:battle_baseball/design/bb.dart';
 import 'package:battle_baseball/screens/account.dart';
 import 'package:battle_baseball/screens/admin.dart';
@@ -101,7 +102,18 @@ final router = GoRouter(
         GoRoute(path: '/leaders', builder: (_, _) => const LeaderboardsScreen()),
         GoRoute(path: '/leaderboards', redirect: (_, _) => '/leaders'),
         GoRoute(path: '/host', builder: (_, _) => const HostScreen()),
-        GoRoute(path: '/merch', builder: (_, _) => const MerchScreen()),
+        GoRoute(
+          path: '/merch',
+          builder: (_, _) => const MerchScreen(),
+          routes: [
+            GoRoute(path: 'cart', builder: (_, _) => const CartScreen()),
+            GoRoute(
+              path: ':handle',
+              builder: (_, s) => ProductScreen(handle: s.pathParameters['handle']!),
+            ),
+          ],
+        ),
+        GoRoute(path: '/shop', redirect: (_, _) => '/merch'),
         GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
         GoRoute(path: '/more', redirect: (_, _) => '/account'),
         GoRoute(
@@ -167,9 +179,11 @@ class AppShell extends StatelessWidget {
 
   static const _paths = ['/events', '/players', '/', '/leaders', '/account'];
 
-  /// Which of the five tabs the current screen belongs to, or -1.
+  /// Which of the five tabs the current screen belongs to, or -1. The shop
+  /// is 5: a link of its own in the top bar, no tab on phones.
   int get _tab {
     bool under(String root) => location == root || location.startsWith('$root/');
+    if (under('/merch')) return 5;
     if (location == '/' || under('/host')) return 2;
     if (under('/events')) return 0;
     if (under('/players')) return 1;
@@ -185,7 +199,11 @@ class AppShell extends StatelessWidget {
       return Scaffold(
         body: Column(
           children: [
-            _TopBar(tab: _tab, location: location),
+            // Like the bottom bar, the top bar's words only grow so far.
+            MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.15,
+              child: _TopBar(tab: _tab, location: location),
+            ),
             Expanded(child: MediaQuery.removePadding(context: context, removeTop: true, child: child)),
           ],
         ),
@@ -248,15 +266,41 @@ class _TopBar extends StatelessWidget {
                     label: 'Battle Baseball, home',
                     builder: (context, down, focused) => const Wordmark(height: 46.4),
                   ),
-                  Container(
-                    width: 1.5,
-                    height: 34,
-                    margin: const EdgeInsets.only(left: 26, right: 18),
-                    color: BB.hairline,
+                  // The city, then the stamp, give way when the window is
+                  // narrow, so the links and Sign in always fit.
+                  Expanded(
+                    child: Row(
+                      children: [
+                        if (MediaQuery.sizeOf(context).width >= 1100) ...[
+                          Container(
+                            width: 1.5,
+                            height: 34,
+                            margin: const EdgeInsets.only(left: 26, right: 18),
+                            color: BB.hairline,
+                          ),
+                          Flexible(
+                            child: Text(
+                              'BATON ROUGE, LA',
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.fade,
+                              style: BB.caps(13),
+                            ),
+                          ),
+                        ],
+                        if (Repo.stampDemo) ...[
+                          const SizedBox(width: 22),
+                          const Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Stamp('SAMPLE DATA'),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                  Text('BATON ROUGE, LA', style: BB.caps(13)),
-                  if (Repo.stampDemo) ...[const SizedBox(width: 22), const Stamp('SAMPLE DATA')],
-                  const Spacer(),
                   Semantics(
                     container: true,
                     explicitChildNodes: true,
@@ -267,10 +311,19 @@ class _TopBar extends StatelessWidget {
                         link('Players', 1, '/players'),
                         const SizedBox(width: 4),
                         link('Leaders', 3, '/leaders'),
+                        const SizedBox(width: 4),
+                        link('Merch', 5, '/merch'),
                       ],
                     ),
                   ),
                   const SizedBox(width: 20),
+                  // The cart, once something's in it and you're not already shopping.
+                  ListenableBuilder(
+                    listenable: Shop.instance,
+                    builder: (context, _) => Shop.instance.count == 0 || tab == 5
+                        ? const SizedBox.shrink()
+                        : const Padding(padding: EdgeInsets.only(right: 12), child: CartButton(compact: true)),
+                  ),
                   ListenableBuilder(
                     listenable: Session.instance,
                     builder: (context, _) {

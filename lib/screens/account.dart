@@ -2,6 +2,7 @@
 // the static pages.
 import 'package:battle_baseball/data/repo.dart';
 import 'package:battle_baseball/data/session.dart';
+import 'package:battle_baseball/data/shop.dart';
 import 'package:battle_baseball/design/bb.dart';
 import 'package:battle_baseball/screens/common.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -125,12 +126,7 @@ class _AccountView extends StatelessWidget {
           trailing: BBIcon(BBGlyph.external, size: 20, color: BB.ink),
           onTap: openBattleplan,
         ),
-        _Row(
-          'Merch',
-          sub: 'Battle Baseball tees',
-          trailing: const Pill('Coming soon'),
-          onTap: () => context.go('/merch'),
-        ),
+        const _MerchRow(),
         const _Row(
           'Battle Paddle',
           sub: 'Swing training tool for elite mechanics',
@@ -213,6 +209,33 @@ class _Row extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      );
+}
+
+/// The way to the shop, marked Coming soon until the Shopify store opens.
+class _MerchRow extends StatefulWidget {
+  const _MerchRow();
+
+  @override
+  State<_MerchRow> createState() => _MerchRowState();
+}
+
+class _MerchRowState extends State<_MerchRow> {
+  @override
+  void initState() {
+    super.initState();
+    Shop.instance.load();
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: Shop.instance,
+        builder: (context, _) => _Row(
+          'Merch',
+          sub: 'Battle Baseball tees',
+          trailing: Shop.instance.comingSoon ? const Pill('Coming soon') : null,
+          onTap: () => context.go('/merch'),
         ),
       );
 }

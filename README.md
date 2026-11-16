@@ -16,8 +16,8 @@ One Flutter app for the web, iPhone, and Android, on Firebase. The design is "Th
 | `lib/design/bb.dart` | Tokens (colors from the scheme in use, type), the theme, and the primitives: buttons, paper panels, pills, chips, the wordmark, the fine-print sheet |
 | `lib/design/card.dart` | The player card front and back, award seals, leaderboard rows, the velocity chart |
 | `lib/design/ticket.dart` | The showcase ticket |
-| `lib/data/` | Models, Firestore reads and writes (`repo.dart`), who's signed in with which role (`session.dart`), the sample player (`sample.dart`), and sample data for demo mode (`demo.dart`) |
-| `lib/screens/` | Home, Showcases (list, detail, reserve, results), Players (directory, profile, form), Leaders, Host, Account, sign-in, Admin, and event-day tools (check-in, radar, stats, awards, publish) |
+| `lib/data/` | Models, Firestore reads and writes (`repo.dart`), who's signed in with which role (`session.dart`), the sample player (`sample.dart`), sample data for demo mode (`demo.dart`), and the merch shop: Shopify products, the cart and checkout (`shop.dart`), product descriptions (`shop_html.dart`), and the sample shirts (`shop_sample.dart`) |
+| `lib/screens/` | Home, Showcases (list, detail, reserve, results), Players (directory, profile, form), Leaders, Merch (the shop, a shirt, the cart), Host, Account, sign-in, Admin, and event-day tools (check-in, radar, stats, awards, publish) |
 | `lib/app.dart` | Routes and the shell: a bottom bar on phones, a top bar from 960 px |
 | `web/` | The Flutter web shell: `index.html`, manifest, icons |
 | `website/` | The five plain pages. `pages/*.html` are wrapped in `_layout.html` by `tools/build_hosting.mjs`; `site.css` and `fonts/` are all they use |
@@ -35,6 +35,7 @@ One Flutter app for the web, iPhone, and Android, on Firebase. The design is "Th
 | `/players/sample` | The sample card |
 | `/players/new`, `/players/:id/edit` | The player form (sign-in) |
 | `/leaders` | Leaders |
+| `/merch`, `/merch/:handle`, `/merch/cart` | Merch: the shop, a shirt, the cart (`/shop` redirects to `/merch`) |
 | `/host` | Host a Showcase |
 | `/account` | Account |
 | `/sign-in`, `/sign-up`, `/welcome` | Sign in, create an account, finish an account |
@@ -70,13 +71,20 @@ To make an account the owner: sign up in the app, then in the Firebase console c
 
 Parents pay the owner's Venmo or Cash App (set in Admin, Payment settings) with a code like `BB-7K2F` in the note, then tap **Reserve**. The spot is held for 24 hours while any admin of the event confirms it with **Mark paid**. Holds that end show up at the top of Payments for an admin to release to the waitlist; families get an **I already paid** button.
 
+## Merch
+
+Merch (`/merch`, and a section on Home) sells the shirts in the Battle Baseball Shopify store, `t03zrq-mv.myshopify.com`, which NinjaPOD prints and ships. The app reads the products, collections, prices and sizes from Shopify's Storefront API (`lib/data/shop.dart`). Shirts and collections are managed in Shopify admin: each collection with shirts in it becomes a section of the shop, except the "Home page" collection. No token is needed. To use one, build with `--dart-define=SHOPIFY_STOREFRONT_TOKEN=...`. The API version is `ShopConfig.apiVersion` (`2026-10`); Shopify keeps each version working for at least a year, so move it up once a year.
+
+- While the store's password page is on, Shopify reports the store as locked and Merch shows **Coming soon**. Turning the password page off opens the shop in the app, with no deploy.
+- The cart lives on the device: in the browser's `localStorage` under `bb.cart`, and in memory in the iOS and Android apps, where it lasts while the app is open. **Check out** makes a Shopify cart and opens Shopify's checkout page; on the web it takes the tab. Shopify deletes a cart once its order is placed, so when the buyer comes back the app sees that and takes the bought shirts out of its cart. Prices and sold-out sizes are checked again each time the cart opens.
+
 ## Color schemes
 
 Royal Blue is the default. A Battle Baseball admin opens Staff tools > Color scheme, taps a scheme to try it on (only they see it), then taps **Use for everyone**, which saves it to `config/theme` and logs the change. Every open copy of the app switches within a second or two. On the web the scheme's colors are also remembered in the browser (`localStorage` key `bb.scheme`), so the loading screen and the plain pages match it. Add `?scheme=<id>` to a URL (for example `?scheme=christmas`) to look at a scheme without saving it. The ids are in `lib/design/schemes.dart`.
 
 ## Demo mode
 
-Add `?demo=1` to any URL to see the app filled with sample data; every write is refused, except that a color scheme picked in Staff tools lasts until the page reloads. `?demo=family` adds a pretend signed-in parent, and `?demo=staff` an owner. It lasts until a full page reload. `/dev/gallery` (demo only) shows every shared component.
+Add `?demo=1` to any URL to see the app filled with sample data; every write is refused, except that a color scheme picked in Staff tools lasts until the page reloads. `?demo=family` adds a pretend signed-in parent, and `?demo=staff` an owner. It lasts until a full page reload. `/dev/gallery` (demo only) shows every shared component. Merch shows three sample shirts (`lib/data/shop_sample.dart`), and checkout is switched off.
 
 ## Build and deploy
 

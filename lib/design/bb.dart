@@ -720,6 +720,7 @@ class BBButton extends StatelessWidget {
     this.busy = false,
     this.small = false,
     this.large = false,
+    this.semanticLabel,
   });
 
   /// Coral face, ink label.
@@ -732,6 +733,7 @@ class BBButton extends StatelessWidget {
     this.busy = false,
     this.small = false,
     this.large = false,
+    this.semanticLabel,
   }) : kind = BBButtonKind.primary;
 
   /// Cream face, ink label.
@@ -744,6 +746,7 @@ class BBButton extends StatelessWidget {
     this.busy = false,
     this.small = false,
     this.large = false,
+    this.semanticLabel,
   }) : kind = BBButtonKind.paper;
 
   /// Raised-field face, cream label.
@@ -756,6 +759,7 @@ class BBButton extends StatelessWidget {
     this.busy = false,
     this.small = false,
     this.large = false,
+    this.semanticLabel,
   }) : kind = BBButtonKind.quiet;
 
   final String label;
@@ -776,6 +780,9 @@ class BBButton extends StatelessWidget {
 
   /// 62 tall, for the desktop hero.
   final bool large;
+
+  /// What a screen reader says, when [label] alone doesn't say it.
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -818,7 +825,7 @@ class BBButton extends StatelessWidget {
     );
     final Widget pressable = Pressable(
       onTap: enabled ? onPressed : null,
-      label: label,
+      label: semanticLabel ?? label,
       builder: (context, down, focused) => Padding(
         padding: EdgeInsets.only(top: down ? lip : 0, bottom: down ? 0 : lip),
         child: Container(
@@ -974,36 +981,48 @@ class BBChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final h = small ? 30.0 : 38.0;
-    final face = Container(
-      height: h,
-      padding: EdgeInsets.symmetric(horizontal: small ? 12 : 15),
-      decoration: BoxDecoration(
-        color: selected ? BB.coral : null,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: selected ? BB.ink : BB.dashed, width: 2),
-        boxShadow: selected ? BB.lip(3) : null,
-      ),
-      child: Center(
-        widthFactor: 1,
-        child: Text(
-          label,
-          maxLines: 1,
-          softWrap: false,
-          style: BB.labelStyle(small ? 13 : 15, color: selected ? BB.ink : BB.cream, height: 1),
-        ),
-      ),
-    );
-    final chip = MediaQuery.withClampedTextScaling(
-      maxScaleFactor: 1.3,
-      // Room for the lip whether or not it's showing, so rows don't jump.
-      child: Padding(padding: const EdgeInsets.only(bottom: 3), child: face),
-    );
+    Widget chip({bool focused = false}) => MediaQuery.withClampedTextScaling(
+          maxScaleFactor: 1.3,
+          // Room for the lip whether or not it's showing, so rows don't jump.
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 3),
+            child: Container(
+              height: h,
+              // A one-letter chip ("S") is still a 44 px target.
+              constraints: BoxConstraints(minWidth: onTap == null ? 0 : 44),
+              padding: EdgeInsets.symmetric(horizontal: small ? 12 : 15),
+              decoration: BoxDecoration(
+                color: selected ? BB.coral : null,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: selected ? BB.ink : BB.dashed, width: 2),
+                boxShadow: selected ? BB.lip(3) : null,
+              ),
+              // Keyboard focus: a cream ring just outside the chip. (A shadow
+              // would fill an unpicked chip, which has no face of its own.)
+              foregroundDecoration: focused
+                  ? BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: BB.cream, width: 3, strokeAlign: BorderSide.strokeAlignOutside),
+                    )
+                  : null,
+              child: Center(
+                widthFactor: 1,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: BB.labelStyle(small ? 13 : 15, color: selected ? BB.ink : BB.cream, height: 1),
+                ),
+              ),
+            ),
+          ),
+        );
     return Align(
       alignment: AlignmentDirectional.centerStart,
       widthFactor: 1,
       heightFactor: 1,
       child: onTap == null
-          ? chip
+          ? chip()
           : Semantics(
               selected: selected,
               child: Pressable(
@@ -1011,7 +1030,7 @@ class BBChip extends StatelessWidget {
                 builder: (context, down, focused) => Padding(
                   // Chips are 38 tall; the padding makes the target 44.
                   padding: const EdgeInsets.symmetric(vertical: 1.5),
-                  child: chip,
+                  child: chip(focused: focused),
                 ),
               ),
             ),
@@ -1454,6 +1473,7 @@ enum BBGlyph {
   pin,
   tag,
   external,
+  bag,
 }
 
 class BBIcon extends StatelessWidget {
@@ -1662,6 +1682,16 @@ class _GlyphPainter extends CustomPainter {
             ..quadraticBezierTo(17.5, 19.5, 17.5, 17.4)
             ..lineTo(17.5, 15),
           line(2.4),
+        );
+      case BBGlyph.bag:
+        canvas.drawRRect(rr(4.5, 8.2, 15, 12.6, 2.6), line(2.2));
+        canvas.drawPath(
+          Path()
+            ..moveTo(8.6, 11.4)
+            ..lineTo(8.6, 6.8)
+            ..cubicTo(8.6, 2.3, 15.4, 2.3, 15.4, 6.8)
+            ..lineTo(15.4, 11.4),
+          line(2.2),
         );
     }
   }
