@@ -517,6 +517,39 @@ void main() {
           reason: "three fits aren't Youth and Adult, so each keeps its own name");
     });
 
+    test("an adult and a kids' hoodie in two colors: pick a color, then a size under Adult or Youth", () {
+      const adult = 'Gildan G185 Gildan Heavy Blend Hoodie. G185';
+      const kids = "Gildan G185B Gildan Heavy Blend Kids' Hoodie. G185B";
+      final p = ShopProduct(
+        handle: 'cyclones-hoodie',
+        title: 'Cyclones Hoodie',
+        minPrice: 30,
+        maxPrice: 32,
+        options: const [
+          ShopOption('Color', ['White', 'Graphite Heather']),
+          ShopOption('Size', ['S', 'XL', '4XL', 'YS', 'YL']),
+          ShopOption('Product', [adult, kids]),
+        ],
+        variants: [
+          for (final color in ['White', 'Graphite Heather'])
+            for (final size in ['S', 'XL', '4XL', 'YS', 'YL'])
+              ShopVariant(
+                id: '$color/$size',
+                price: size == '4XL' ? 32 : 30,
+                options: {'Color': color, 'Size': size, 'Product': size.startsWith('Y') ? kids : adult},
+              ),
+        ],
+      );
+      expect([for (final c in p.choices) c.name], ['Color', 'Size']);
+      final size = p.choices.last;
+      expect([for (final g in size.groups) g.label], ['Adult', 'Youth']);
+      expect([for (final g in size.groups) g.values], [
+        ['S', 'XL', '4XL'],
+        ['YS', 'YL'],
+      ]);
+      expect(p.describe(p.variants.first), 'Color White · Size S');
+    });
+
     test('variantFor waits until every choice is picked', () {
       final tee = _parse(_tropicJson());
       expect(tee.variantFor({}), isNull);
@@ -1022,6 +1055,33 @@ void main() {
       ]);
       expect(sections[1].description, 'Limited-run shirts.');
       expect(sections[2].description, '');
+    });
+
+    test("participating teams' collections come last, after More, and are marked as teams", () async {
+      final b = _Shopify()
+        ..products = [_listed(_coral), _listed(_tropic), _listed('cyclones-hoodie'), _listed('loose-cap')]
+        ..collections = const [
+          ShopCollection(handle: 'battle-baseball', title: 'Battle Baseball', productHandles: [_tropic]),
+          ShopCollection(handle: 'team-cyclones', title: 'Cyclones', productHandles: ['cyclones-hoodie']),
+          ShopCollection(handle: 'special-edition', title: 'Special Edition', productHandles: [_coral]),
+        ];
+      final shop = Shop(b);
+      await shop.load();
+      final sections = shop.sections;
+      expect(sections.map((s) => s.title), ['Battle Baseball', 'Special Edition', 'More', 'Cyclones']);
+      expect(sections.map((s) => s.team), [false, false, false, true]);
+      expect(sections.last.products.single.handle, 'cyclones-hoodie');
+    });
+
+    test('a team collection alone keeps its title', () async {
+      final shop = Shop(_Shopify()
+        ..products = [_listed('cyclones-hoodie')]
+        ..collections = const [
+          ShopCollection(handle: 'team-cyclones', title: 'Cyclones', productHandles: ['cyclones-hoodie']),
+        ]);
+      await shop.load();
+      expect(shop.sections.single.title, 'Cyclones');
+      expect(shop.sections.single.team, isTrue);
     });
 
     test('with no collections but Home page everything is one untitled section', () async {

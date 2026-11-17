@@ -141,20 +141,7 @@ class _MerchScreenState extends State<MerchScreen> {
                 children: [
                   const _ShopHeader('Home'),
                   const PageTitle('Merch'),
-                  for (final (i, s) in shop.sections.indexed) ...[
-                    if (i > 0) SizedBox(height: wide ? 48 : 36),
-                    if (s.title.isNotEmpty)
-                      SectionTitle(
-                        s.title,
-                        padding: EdgeInsets.only(bottom: s.description.isEmpty ? 16 : 6),
-                      ),
-                    if (s.description.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Text(s.description, style: BB.bodyStyle(16, height: 1.45)),
-                      ),
-                    _ProductGrid(s.products),
-                  ],
+                  ..._sections(shop.sections, wide: wide),
                   const SizedBox(height: 28),
                   Text('Checkout runs on Shopify.', style: BB.bodyStyle(14.5)),
                 ],
@@ -163,6 +150,36 @@ class _MerchScreenState extends State<MerchScreen> {
           };
         },
       );
+}
+
+/// The shop's sections in order. The participating teams come last, under
+/// their own heading, each team titled a size down.
+List<Widget> _sections(List<ShopSection> sections, {required bool wide}) {
+  Widget about(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Text(text, style: BB.bodyStyle(16, height: 1.45)),
+      );
+  return [
+    for (final (i, s) in sections.indexed) ...[
+      if (s.team && (i == 0 || !sections[i - 1].team)) ...[
+        if (i > 0) SizedBox(height: wide ? 48 : 36),
+        const SectionTitle('Participating teams', padding: EdgeInsets.only(bottom: 6)),
+        about('Gear for the teams that play in Battle Baseball showcases.'),
+        const SizedBox(height: 4),
+      ] else if (i > 0)
+        SizedBox(height: s.team ? (wide ? 36 : 28) : (wide ? 48 : 36)),
+      if (s.title.isNotEmpty)
+        if (s.team)
+          Padding(
+            padding: EdgeInsets.only(bottom: s.description.isEmpty ? 14 : 6),
+            child: Semantics(header: true, child: Text(s.title, style: BB.title(wide ? 26 : 22))),
+          )
+        else
+          SectionTitle(s.title, padding: EdgeInsets.only(bottom: s.description.isEmpty ? 16 : 6)),
+      if (s.description.isNotEmpty) about(s.description),
+      _ProductGrid(s.products),
+    ],
+  ];
 }
 
 /// What the shop shows before the Shopify store is open.
