@@ -248,6 +248,33 @@ void main() {
     }
   });
 
+  testWidgets('the back link and Cart stay at the top while the shop or a shirt scrolls', (t) async {
+    // A laptop window short enough that a shirt's page scrolls too.
+    for (final size in [_phone, const Size(1280, 400)]) {
+      for (final location in ['/merch', '/merch/$_tropic']) {
+        Shop.instance = Shop(_Teams());
+        await _fillCart();
+        await _open(t, location, size: size);
+        final at = '$location at ${size.width.round()} wide';
+        final cart = find.text('Cart · 3'), back = find.byType(BackHeader);
+        final cartAt = t.getRect(cart), backAt = t.getRect(back);
+
+        await t.drag(find.byType(SingleChildScrollView).first, const Offset(0, -400));
+        await _settle(t);
+        final page = t.state<ScrollableState>(find.byType(Scrollable).first).position;
+        expect(page.pixels, greaterThan(50), reason: 'the page scrolled, $at');
+        expect(t.getRect(cart), cartAt, reason: 'the Cart button, $at');
+        expect(t.getRect(back), backAt, reason: 'the back link, $at');
+        expect(t.takeException(), isNull, reason: at);
+
+        await t.tap(cart);
+        await _settle(t);
+        expect(find.text('Your cart'), findsOneWidget, reason: at);
+        await _close(t);
+      }
+    }
+  });
+
   testWidgets("Home's two shirts are Battle Baseball shirts, not a team's", (t) async {
     Shop.instance = Shop(_Teams());
     await _open(t, '/');

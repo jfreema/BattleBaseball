@@ -89,6 +89,41 @@ class _ShopHeader extends StatelessWidget {
       );
 }
 
+/// A shop screen whose header stays put while the rest scrolls under it,
+/// so the way back and the Cart are always in reach.
+class _ShopFrame extends StatelessWidget {
+  const _ShopFrame({required this.header, required this.children, this.maxWidth = BB.contentWidth});
+
+  final Widget header;
+  final List<Widget> children;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final safe = MediaQuery.paddingOf(context);
+    final side = BB.isWide(context) ? 40.0 : 16.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // PageFrame's sides and width, so the header sits where it always has.
+        Padding(
+          padding: EdgeInsets.fromLTRB(side + safe.left, safe.top, side + safe.right, 0),
+          child: Center(
+            child: ConstrainedBox(constraints: BoxConstraints(maxWidth: maxWidth), child: header),
+          ),
+        ),
+        Expanded(
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            child: PageFrame(maxWidth: maxWidth, children: children),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// "Cart · 2": the way to the cart from anywhere in the shop.
 class CartButton extends StatelessWidget {
   const CartButton({super.key, this.compact = false});
@@ -137,9 +172,9 @@ class _MerchScreenState extends State<MerchScreen> {
                 children: [_ShopHeader('Home', cart: false), PageTitle('Merch'), LoadingField()],
               ),
             ShopStatus.failed => _DidNotLoad(onRetry: () => shop.load(force: true)),
-            ShopStatus.ready when shop.products.isNotEmpty => PageFrame(
+            ShopStatus.ready when shop.products.isNotEmpty => _ShopFrame(
+                header: const _ShopHeader('Home'),
                 children: [
-                  const _ShopHeader('Home'),
                   const PageTitle('Merch'),
                   ..._sections(shop.sections, wide: wide),
                   const SizedBox(height: 28),
@@ -563,11 +598,11 @@ class _ProductScreenState extends State<ProductScreen> {
       label: p.title,
     );
 
-    return PageFrame(
+    return _ShopFrame(
       // Phone layouts stay a phone's width on a tablet.
       maxWidth: wide ? BB.contentWidth : 560,
+      header: const _ShopHeader('Merch'),
       children: [
-        const _ShopHeader('Merch'),
         if (wide)
           Padding(
             padding: const EdgeInsets.only(top: 12),
