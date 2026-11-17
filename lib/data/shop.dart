@@ -215,7 +215,18 @@ class ShopCollection {
   final String title;
   final String description;
   final List<String> productHandles;
+
+  /// A participating team's collection: its handle starts with "team-"
+  /// ("team-cyclones"). Set it in Shopify under the collection's search
+  /// engine listing, "URL handle".
+  bool get isTeam => handle.startsWith(teamPrefix);
+
+  static const teamPrefix = 'team-';
 }
+
+/// One section of the shop: a collection's products under its title.
+/// [team] marks a participating team's collection.
+typedef ShopSection = ({String title, String description, List<ShopProduct> products, bool team});
 
 /// "$25" or "$25.50".
 String shopPrice(double amount, [String currency = 'USD']) {
@@ -318,10 +329,10 @@ List<Choice> _choices(ShopProduct p) {
 }
 
 /// The print shop's product names are long ("Sport-Tek YST350 ... Youth ...
-/// Tee"). When there are two and just one is a youth shirt, they read
-/// "Youth" and "Adult" instead.
+/// Tee", "Gildan ... Kids' Hoodie"). When there are two and just one is a
+/// youth shirt, they read "Youth" and "Adult" instead.
 Map<String, String>? _youthAdult(List<String> values) {
-  bool youth(String s) => s.toLowerCase().contains('youth');
+  bool youth(String s) => RegExp(r'\byouth\b|\bkids?\b', caseSensitive: false).hasMatch(s);
   if (values.length != 2 || values.where(youth).length != 1) return null;
   return {for (final v in values) v: youth(v) ? 'Youth' : 'Adult'};
 }
@@ -726,25 +737,27 @@ class Shop extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The catalog as sections: each collection that has products, by title,
-  /// then anything in none of them. Shopify's built-in "Home page"
-  /// collection is left out.
-  List<({String title, String description, List<ShopProduct> products})> get sections {
+  /// The catalog as sections: each Battle Baseball collection that has
+  /// products, by title, then anything in no collection, then the
+  /// participating teams' collections ([ShopCollection.isTeam]), by title.
+  /// Shopify's built-in "Home page" collection is left out.
+  List<ShopSection> get sections {
     final byHandle = {for (final p in products) p.handle: p};
     final placed = <String>{};
-    final out = <({String title, String description, List<ShopProduct> products})>[];
+    final ours = <ShopSection>[], teams = <ShopSection>[];
     for (final c in collections) {
       if (c.handle == 'frontpage') continue;
       final list = [for (final h in c.productHandles) ?byHandle[h]];
       if (list.isEmpty) continue;
       placed.addAll(list.map((p) => p.handle));
-      out.add((title: c.title, description: c.description, products: list));
+      (c.isTeam ? teams : ours).add((title: c.title, description: c.description, products: list, team: c.isTeam));
     }
     final rest = [for (final p in products) if (!placed.contains(p.handle)) p];
     if (rest.isNotEmpty) {
-      out.add((title: out.isEmpty ? '' : 'More', description: '', products: rest));
+      final alone = ours.isEmpty && teams.isEmpty;
+      ours.add((title: alone ? '' : 'More', description: '', products: rest, team: false));
     }
-    return out;
+    return [...ours, ...teams];
   }
 
   /// One product in full. Null when there's no such product; throws

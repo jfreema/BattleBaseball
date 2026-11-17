@@ -185,6 +185,24 @@ class _Hoodies extends SampleShop {
   Future<ShopProduct?> product(String handle) async => handle == hoodie.handle ? hoodie : super.product(handle);
 }
 
+/// The sample shirts plus a participating team's collection, the Cyclones,
+/// with one hoodie.
+class _Teams extends SampleShop {
+  static const hoodie = ShopProduct(handle: 'cyclones-hoodie', title: 'Cyclones Hoodie', minPrice: 30, maxPrice: 32);
+
+  @override
+  Future<({List<ShopCollection> collections, List<ShopProduct> products})> catalog() async {
+    final c = await super.catalog();
+    return (
+      collections: [
+        const ShopCollection(handle: 'team-cyclones', title: 'Cyclones', productHandles: ['cyclones-hoodie']),
+        ...c.collections,
+      ],
+      products: [...c.products, hoodie],
+    );
+  }
+}
+
 void main() {
   setUpAll(_loadAppFonts);
   setUp(() => Shop.instance = Shop(SampleShop()));
@@ -208,6 +226,35 @@ void main() {
     expect(coral, greaterThan(special));
     expect(find.text(r'From $25'), findsNWidgets(2));
     expect(find.text(r'From $26'), findsOneWidget);
+    await _close(t);
+  });
+
+  testWidgets("participating teams come after the Battle Baseball shirts, under their own heading", (t) async {
+    Shop.instance = Shop(_Teams());
+    for (final size in [_phone, _desktop]) {
+      await _open(t, '/merch', size: size);
+      expect(t.takeException(), isNull);
+      _expectReadingOrder(t, [
+        'Battle Baseball',
+        'Battle Baseball Tee - True Royal',
+        'Special Edition',
+        'Battle Baseball Special Edition Tee - Coral (Adult)',
+        'Participating teams',
+        'Cyclones',
+        'Cyclones Hoodie',
+      ]);
+      expect(find.text(r'From $30'), findsOneWidget);
+      await _close(t);
+    }
+  });
+
+  testWidgets("Home's two shirts are Battle Baseball shirts, not a team's", (t) async {
+    Shop.instance = Shop(_Teams());
+    await _open(t, '/');
+    expect(find.text('Shop all merch'), findsOneWidget);
+    expect(find.text('Battle Baseball Tee - True Royal'), findsOneWidget);
+    expect(find.text('Cyclones Hoodie'), findsNothing);
+    expect(t.takeException(), isNull);
     await _close(t);
   });
 
