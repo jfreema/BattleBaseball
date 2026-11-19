@@ -182,10 +182,13 @@ class TabHeader extends StatelessWidget {
 /// room for one thing beside it and one at the right. Going back defaults to
 /// the path one level up ("/players/abc" to "/players").
 class BackHeader extends StatelessWidget {
-  const BackHeader(this.label, {super.key, this.onBack, this.beside, this.trailing});
+  const BackHeader(this.label, {super.key, this.onBack, this.beside, this.trailing, this.height});
 
   final String label;
   final VoidCallback? onBack;
+
+  /// 48 on desktop and 62 on phones, unless a screen sets its own.
+  final double? height;
 
   /// Sits right after the label (the SAMPLE stamp).
   final Widget? beside;
@@ -232,7 +235,7 @@ class BackHeader extends StatelessWidget {
     // Sample data says so at the right, as the tab screens do.
     final right = trailing ?? (Repo.stampDemo && !BB.isWide(context) ? const Stamp('SAMPLE DATA') : null);
     return SizedBox(
-      height: BB.isWide(context) ? 48 : 62,
+      height: height ?? (BB.isWide(context) ? 48 : 62),
       child: Row(
         children: [
           Expanded(

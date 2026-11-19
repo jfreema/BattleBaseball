@@ -35,6 +35,8 @@ flutter:
   # SIL OFL 1.1; the licenses ship beside them.
   assets:
     - assets/merch/
+    # The baseball tank, beside Battle Shop's name (tools/brand/app_icon.py).
+    - assets/brand/
     - assets/fonts/lilita_one/OFL.txt
     - assets/fonts/fredoka/OFL.txt
     - assets/fonts/nunito/OFL.txt

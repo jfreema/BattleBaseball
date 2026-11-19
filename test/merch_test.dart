@@ -62,11 +62,14 @@ GoRouter _router(String location) => GoRouter(
       ],
     );
 
-/// The address the app opened by [_open] is showing now.
+/// The address the app opened by [_open] or [_openShop] is showing now.
 String _location(WidgetTester t) =>
-    GoRouter.of(t.element(find.byType(PageFrame).first)).routerDelegate.currentConfiguration.uri.path;
+    GoRouter.of(t.element(find.byType(Scaffold).first)).routerDelegate.currentConfiguration.uri.path;
 
 Finder _mark(String second) => find.byWidgetPredicate((w) => w is Wordmark && w.second == second);
+
+/// Battle Shop's headline, which is read out as one line.
+Finder _headline() => find.bySemanticsLabel('Shirts and team gear.');
 
 /// Opens the app at [location] in a window [size] logical pixels big, with
 /// text scaled by [text].
@@ -611,7 +614,7 @@ void main() {
       await _openShop(t, '/', size: size);
       final at = '${size.width.round()} wide';
       expect(t.takeException(), isNull, reason: at);
-      expect(_mark('Shop'), findsOneWidget, reason: at);
+      expect(find.byType(ShopMark), findsOneWidget, reason: at);
       expect(_mark('Baseball'), findsNothing, reason: at);
       expect(find.byType(BackHeader), findsNothing, reason: 'nothing to go back to, $at');
       expect(find.text('Home'), findsNothing, reason: at);
@@ -696,7 +699,7 @@ void main() {
     Shop.instance = Shop(_Teams());
     await _fillCart();
     await _openShop(t, '/');
-    final cart = find.text('Cart · 3'), mark = _mark('Shop');
+    final cart = find.text('Cart · 3'), mark = find.byType(ShopMark);
     final cartAt = t.getRect(cart), markAt = t.getRect(mark);
     await t.drag(find.byType(SingleChildScrollView).first, const Offset(0, -400));
     await _settle(t);
@@ -741,6 +744,138 @@ void main() {
             await _close(t);
           }
         }
+      }
+    }
+  });
+
+  testWidgets("Battle Shop's band, with its mark and the Cart, tops every page, and its footer ends each one",
+      (t) async {
+    for (final size in [_phone, _desktop]) {
+      for (final location in ['/', '/$_tropic', '/cart', '/no-such-shirt']) {
+        Shop.instance = Shop(SampleShop());
+        await _fillCart();
+        await _openShop(t, location, size: size);
+        final at = '$location at ${size.width.round()} wide';
+        expect(t.takeException(), isNull, reason: at);
+        final mark = t.getRect(find.byType(ShopMark)), cart = t.getRect(find.text('Cart · 3'));
+        expect(mark.top, greaterThanOrEqualTo(0), reason: at);
+        expect(mark.bottom, lessThan(size.width >= BB.breakpoint ? 116 : 76), reason: 'the mark is in the band, $at');
+        expect(cart.bottom, lessThan(size.width >= BB.breakpoint ? 116 : 76), reason: 'the Cart is in the band, $at');
+        expect(cart.right, lessThanOrEqualTo(size.width), reason: at);
+        // One Cart button, the band's: the page under it has none of its own.
+        expect(find.byType(CartButton), findsOneWidget, reason: at);
+        expect(find.text('Checkout runs on Shopify.'), findsOneWidget, reason: 'the footer, $at');
+        expect(_mark('Shop'), findsNWidgets(2), reason: 'the band and the footer, $at');
+
+        // The mark leads to the shop's first page.
+        await _tap(t, _pressable('Battle Shop, all shirts'));
+        expect(_location(t), '/', reason: at);
+        expect(_headline(), findsOneWidget, reason: at);
+        await _close(t);
+      }
+    }
+  });
+
+  testWidgets("on a page shorter than the window Battle Shop's footer sits at the window's bottom", (t) async {
+    for (final size in [_phone, _desktop]) {
+      await _openShop(t, '/cart', size: size);
+      final at = '${size.width.round()} wide';
+      expect(find.text('Nothing in your cart yet.'), findsOneWidget, reason: at);
+      final footer = t.getRect(find.text('Checkout runs on Shopify.'));
+      expect(footer.bottom, lessThanOrEqualTo(size.height), reason: at);
+      expect(footer.bottom, greaterThan(size.height - 90), reason: 'at the bottom, not under the cart, $at');
+      expect(t.takeException(), isNull, reason: at);
+      await _close(t);
+    }
+  });
+
+  testWidgets("Battle Shop's first page opens with its headline and what a shopper can count on", (t) async {
+    for (final size in [_phone, _narrow, _desktop]) {
+      Shop.instance = Shop(_Teams());
+      await _openShop(t, '/', size: size);
+      final at = '${size.width.round()} wide';
+      expect(t.takeException(), isNull, reason: at);
+      expect(_headline(), findsOneWidget, reason: at);
+      for (final promise in ['Printed to order', 'Shipped to you', 'Secure checkout on Shopify']) {
+        expect(find.text(promise), findsOneWidget, reason: '$promise, $at');
+        expect(t.getRect(find.text(promise)).right, lessThanOrEqualTo(size.width), reason: '$promise, $at');
+      }
+      // The headline comes first, then the shirts.
+      expect(t.getRect(_headline()).bottom, lessThan(t.getTopLeft(find.text('Battle Baseball')).dy), reason: at);
+      await _close(t);
+    }
+  });
+
+  testWidgets("on desktop the two shirts beside Battle Shop's headline open their pages", (t) async {
+    Shop.instance = Shop(SampleShop());
+    await _openShop(t, '/', size: _desktop);
+    // The first two shirts the shop lists, the first of them on top.
+    final first = Shop.instance.sections.first.products;
+    final front = _pressable(first[0].title);
+    expect(front, findsOneWidget);
+    expect(_pressable(first[1].title), findsOneWidget);
+    await _tap(t, front);
+    expect(_location(t), '/${first[0].handle}');
+    expect(find.text('Add to cart'), findsOneWidget);
+    expect(t.takeException(), isNull);
+    await _close(t);
+
+    // On a phone the shirts themselves are right under the headline.
+    await _openShop(t, '/');
+    expect(front, findsNothing);
+    await _close(t);
+  });
+
+  testWidgets("a shirt's page on Battle Shop ends with the shop's other shirts, each leading to its own page",
+      (t) async {
+    for (final size in [_phone, _desktop]) {
+      Shop.instance = Shop(_Teams());
+      await _openShop(t, '/$_tropic', size: size);
+      final at = '${size.width.round()} wide';
+      expect(t.takeException(), isNull, reason: at);
+      expect(find.text('More from the shop'), findsOneWidget, reason: at);
+      // Its own section's other shirt comes first; the shirt itself isn't listed.
+      expect(find.text('Battle Baseball Tee - True Royal'), findsOneWidget, reason: at);
+      expect(find.text('Battle Baseball Tee - Tropic Blue'), findsOneWidget, reason: "only the page's own title, $at");
+      for (final promise in ['Printed to order', 'Shipped to you', 'Secure checkout on Shopify']) {
+        expect(find.text(promise), findsOneWidget, reason: '$promise, $at');
+      }
+
+      await _tap(t, find.text('Battle Baseball Tee - True Royal'));
+      expect(_location(t), '/battle-baseball-tee-true-royal', reason: at);
+      expect(find.text('Add to cart'), findsOneWidget, reason: at);
+      expect(find.text('Battle Baseball Tee - Tropic Blue'), findsOneWidget, reason: 'now one of the others, $at');
+      expect(t.takeException(), isNull, reason: at);
+      await _close(t);
+    }
+  });
+
+  testWidgets("a shared link to a shirt reads the shop for the shirts under it", (t) async {
+    // Nothing has opened the shop's first page, so the catalog isn't read yet.
+    expect(Shop.instance.status, ShopStatus.loading);
+    await _openShop(t, '/$_coral');
+    expect(Shop.instance.status, ShopStatus.ready);
+    expect(find.text('More from the shop'), findsOneWidget);
+    expect(t.takeException(), isNull);
+    await _close(t);
+  });
+
+  testWidgets('Merch in the app keeps its own look: none of Battle Shop\'s band, headline, extras or footer',
+      (t) async {
+    for (final size in [_phone, _desktop]) {
+      for (final location in ['/merch', '/merch/$_tropic']) {
+        Shop.instance = Shop(SampleShop());
+        await _open(t, location, size: size);
+        final at = '$location at ${size.width.round()} wide';
+        expect(t.takeException(), isNull, reason: at);
+        expect(find.byType(ShopMark), findsNothing, reason: at);
+        expect(_headline(), findsNothing, reason: at);
+        expect(find.text('Printed to order'), findsNothing, reason: at);
+        expect(find.text('More from the shop'), findsNothing, reason: at);
+        expect(find.byType(DashedRule), findsNothing, reason: at);
+        expect(find.byType(BackHeader), findsOneWidget, reason: at);
+        if (location == '/merch') expect(find.text('Checkout runs on Shopify.'), findsOneWidget, reason: at);
+        await _close(t);
       }
     }
   });
