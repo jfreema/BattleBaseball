@@ -38,7 +38,7 @@ if (existsSync(join(web, "index.html"))) {
 
 // Battle Shop: the app again, as a site of its own. Its index.html is the
 // app's with Battle Shop's name in place of Battle Baseball's (the tab's
-// title, the link preview a shared address gets, the mark on the loading
+// title, the link preview a shared address gets, the band on the loading
 // screen) and with <meta name="bb-site" content="shop">, which the app reads
 // (lib/data/site.dart) to show the shop and none of its other screens.
 const shop = {
@@ -79,11 +79,43 @@ if (existsSync(join(web, "index.html"))) {
   attr("meta", "name", "twitter:description", shop.description);
   attr("meta", "name", "twitter:image", `${shop.origin}/${shop.image}`);
   attr("meta", "name", "apple-mobile-web-app-title", shop.short);
+  // A phone's browser tints its bar to match the band at the top of the page.
+  attr("meta", "name", "theme-color", "#1A3F9A");
   // What tells the app which site it is.
   set(/(<meta name="viewport"[^>]*>\n)()/, '  <meta name="bb-site" content="shop">\n');
-  // The loading screen: BATTLE over SHOP, and no showcase headline.
-  set(/(<div class="shell-mark"><b>BATTLE<\/b><i>)BASEBALL(<\/i><\/div>)/, "SHOP");
+  // The loading screen: Battle Shop's band as the app draws it (the tank and
+  // BATTLE over SHOP on the darker blue, over a line of stitches), and no
+  // showcase headline. Sizes and positions mirror _BattleShopBar and ShopMark
+  // in lib/screens/merch.dart, so the app's first frame lands on top of this
+  // without anything moving.
+  set(
+    /(<div class="shell-bar">)<div class="shell-mark"><b>BATTLE<\/b><i>BASEBALL<\/i><\/div>(<\/div>)/,
+    '<div class="shell-row"><img class="shell-tank" src="assets/assets/brand/tank.png" alt="">' +
+      '<div class="shell-mark"><b>BATTLE</b><i>SHOP</i></div></div>',
+  );
   set(/()[ \t]*<div class="shell-home">[\s\S]*?<\/div>\n()/, "");
+  set(
+    /(\n)(  <\/style>)/,
+    `    /* Battle Shop's band: 76 px on phones and 116 on desktop, on a 3 px ink
+       edge, with the mark set in the room above the stitches. */
+    .shell-bar {
+      position: relative; box-sizing: content-box; max-width: none; margin: 0; padding: 0; height: 76px;
+      background: #1a3f9b; background: color-mix(in srgb, var(--ink) 30%, var(--field));
+      border-bottom: 3px solid var(--ink); --s: 1.24675;
+    }
+    .shell-bar::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: 5px; height: 2px;
+      background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--coral) 65%, transparent) 0 7px, transparent 7px 12px);
+    }
+    .shell-row { box-sizing: border-box; display: flex; align-items: center; max-width: 1200px; height: 72px; margin: 0 auto; padding: 0 16px; }
+    .shell-tank { height: calc(34.65px * var(--s)); width: auto; margin-right: calc(9.24px * var(--s)); }
+    @media (min-width: 960px) {
+      .shell-bar { max-width: none; padding: 0; height: 116px; --s: 1.87013; }
+      .shell-bar::after { bottom: 7px; }
+      .shell-row { height: 110px; padding: 0 40px; }
+    }
+`,
+  );
   writeFileSync(join(shopOut, "index.html"), html);
 
   const manifest = JSON.parse(readFileSync(join(web, "manifest.json"), "utf8"));

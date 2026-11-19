@@ -11,6 +11,8 @@
 # android/app/src/main/res/mipmap-*/ic_launcher.png  the square icon
 # android/app/src/main/res/mipmap-*/ic_launcher_foreground.png  the adaptive
 #   icon's tank (Android 8+), on @color/ic_launcher_background
+# assets/brand/tank.png  the tank alone, 480 px wide, beside Battle Shop's
+#   name in its header (ShopMark in lib/screens/merch.dart)
 import json
 from pathlib import Path
 
@@ -53,3 +55,8 @@ fg = square(60 / 108, (0, 0, 0, 0))
 for density, scale in {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}.items():
     save(icon, round(48 * scale), res / f"mipmap-{density}/ic_launcher.png")
     save(fg, round(108 * scale), res / f"mipmap-{density}/ic_launcher_foreground.png", rgb=False)
+
+# In the app: the tank on nothing, small enough to ship.
+tank.resize((480, round(tank.height * 480 / tank.width)), Image.LANCZOS).save(
+    ROOT / "assets/brand/tank.png", optimize=True
+)
