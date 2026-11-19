@@ -6,8 +6,8 @@ One Flutter app for the web, iPhone, and Android, on Firebase. The design is "Th
 
 - Site: https://showcase.getbattleplan.app. The Flutter web build is served at the root, and its signed-out Home is the landing page.
 - Five plain pages sit beside it: `/privacy`, `/terms`, `/waiver`, `/support`, `/delete-account`.
-- Battle Shop, https://showcase.getbattleplan.app/shop, is the Merch shop on its own: the same shirts and cart, with nothing of the Battle Baseball site around it and no link into it (see Merch below).
-- Firebase project: `battlebaseball-prod` (Firestore, Authentication, Hosting). DNS is in Cloudflare's `getbattleplan.app` zone.
+- Battle Shop, https://shop.getbattleplan.app, is the Merch shop on a site of its own: the same shirts and cart, with nothing of the Battle Baseball site around it and no link into it (see Merch below).
+- Firebase project: `battlebaseball-prod` (Firestore, Authentication, Hosting). It has two Hosting sites: `battlebaseball-prod` (the Battle Baseball site) and `battlebaseball-shop` (Battle Shop). DNS is in Cloudflare's `getbattleplan.app` zone: `showcase` and `shop` are DNS-only CNAMEs to each site's `.web.app` address.
 
 ## Layout
 
@@ -17,12 +17,12 @@ One Flutter app for the web, iPhone, and Android, on Firebase. The design is "Th
 | `lib/design/bb.dart` | Tokens (colors from the scheme in use, type), the theme, and the primitives: buttons, paper panels, pills, chips, the wordmark, the fine-print sheet |
 | `lib/design/card.dart` | The player card front and back, award seals, leaderboard rows, the velocity chart |
 | `lib/design/ticket.dart` | The showcase ticket |
-| `lib/data/` | Models, Firestore reads and writes (`repo.dart`), who's signed in with which role (`session.dart`), the sample player (`sample.dart`), sample data for demo mode (`demo.dart`), and the merch shop: Shopify products, the cart and checkout (`shop.dart`), product descriptions (`shop_html.dart`), and the sample shirts (`shop_sample.dart`) |
+| `lib/data/` | Models, Firestore reads and writes (`repo.dart`), who's signed in with which role (`session.dart`), the sample player (`sample.dart`), sample data for demo mode (`demo.dart`), the merch shop: Shopify products, the cart and checkout (`shop.dart`), product descriptions (`shop_html.dart`), and the sample shirts (`shop_sample.dart`), and which of the two sites the app was opened as (`site.dart`) |
 | `lib/screens/` | Home, Showcases (list, detail, reserve, results), Players (directory, profile, form), Leaders, Merch (the shop, a shirt, the cart, and Battle Shop's frame around the same screens), Host, Account, sign-in, Admin, and event-day tools (check-in, radar, stats, awards, publish) |
-| `lib/app.dart` | Routes and the shell: a bottom bar on phones, a top bar from 960 px. Battle Shop's routes sit outside the shell |
+| `lib/app.dart` | Routes and the shell: a bottom bar on phones, a top bar from 960 px. On Battle Shop's site the routes are the shop's alone |
 | `web/` | The Flutter web shell: `index.html`, manifest, icons, and the link preview images (`og.png`, and `og-shop.png` for Battle Shop) |
 | `website/` | The five plain pages. `pages/*.html` are wrapped in `_layout.html` by `tools/build_hosting.mjs`; `site.css` and `fonts/` are all they use |
-| `firebase.json` | Hosting serves a file when one matches and hands every other path to the app; `/app/*` redirects to the root. `/shop` and `/shop/**` get `shop.html`, the app under Battle Shop's name |
+| `firebase.json` | Two Hosting sites. Each serves a file when one matches and hands every other path to the app. On the Battle Baseball site `/app/*` redirects to the root and `/shop` to Battle Shop's site |
 | `firestore.rules` | Who can do what (below) |
 
 ## Routes
@@ -36,12 +36,13 @@ One Flutter app for the web, iPhone, and Android, on Firebase. The design is "Th
 | `/players/sample` | The sample card |
 | `/players/new`, `/players/:id/edit` | The player form (sign-in) |
 | `/leaders` | Leaders |
-| `/merch`, `/merch/:handle`, `/merch/cart` | Merch: the shop, a shirt, the cart |
-| `/shop`, `/shop/:handle`, `/shop/cart` | Battle Shop: the same three screens on their own, outside the app's shell |
+| `/merch`, `/merch/:handle`, `/merch/cart` | Merch: the shop, a shirt, the cart (`/shop` goes to Battle Shop's site) |
 | `/host` | Host a Showcase |
 | `/account` | Account |
 | `/sign-in`, `/sign-up`, `/welcome` | Sign in, create an account, finish an account |
 | `/admin/...` | Staff tools (staff only) |
+
+Battle Shop's site, https://shop.getbattleplan.app, has three addresses and none of the above: `/` is the shop, `/:handle` a shirt, `/cart` the cart.
 
 ## Data
 
@@ -78,7 +79,7 @@ Parents pay the owner's Venmo or Cash App (set in Admin, Payment settings) with 
 Merch (`/merch`, and a section on Home) sells the shirts in the Battle Baseball Shopify store, `t03zrq-mv.myshopify.com`, which NinjaPOD prints and ships. The app reads the products, collections, prices and sizes from Shopify's Storefront API (`lib/data/shop.dart`). Shirts and collections are managed in Shopify admin: each collection with shirts in it becomes a section of the shop, except the "Home page" collection. No token is needed. To use one, build with `--dart-define=SHOPIFY_STOREFRONT_TOKEN=...`. The API version is `ShopConfig.apiVersion` (`2026-10`); Shopify keeps each version working for at least a year, so move it up once a year.
 
 - While the store's password page is on, Shopify reports the store as locked and Merch shows **Coming soon**. Turning the password page off opens the shop in the app, with no deploy.
-- **Battle Shop** (`/shop`) is the same shop standing alone, for sharing where the showcase site would be in the way. It shows whatever Merch shows, straight from Shopify, with the same cart. In place of the app's tabs and top bar it has its own mark (BATTLE over SHOP) and the Cart, and nothing on it leads to Home or any other Battle Baseball screen: back links stop at `/shop`, and a signed-in visitor is never sent to the app's screens from it. The screens are Merch's own (`lib/screens/merch.dart`); `ShopSite` tells them which of the two they are showing in, and `BattleShopShell` is the frame. `tools/build_hosting.mjs` writes `shop.html`, a copy of the app's `index.html` with Battle Shop's title, description, link preview (`web/og-shop.png`, drawn from `tools/brand/og-shop.html`) and loading-screen mark, and `firebase.json` serves it for `/shop` and everything under it.
+- **Battle Shop** (https://shop.getbattleplan.app) is the same shop on a site of its own, for sharing where the showcase site would be in the way. It shows whatever Merch shows, straight from Shopify. In place of the app's tabs and top bar it has its own mark (BATTLE over SHOP) and the Cart, and nothing on it leads to Home or any other Battle Baseball screen; those screens have no address there at all. It is the same build of the app: `tools/build_hosting.mjs` makes a second site folder, `build/hosting-shop`, whose `index.html` carries Battle Shop's title, description, link preview (`web/og-shop.png`, drawn from `tools/brand/og-shop.html`) and loading-screen mark, plus `<meta name="bb-site" content="shop">`. The app reads that (`lib/data/site.dart`) and uses Battle Shop's routes. The screens are Merch's own (`lib/screens/merch.dart`); `ShopSite` tells them which of the two they are showing in, and `BattleShopShell` is the frame. Its cart is its own, since a browser keeps each site's storage apart. To run it locally: `flutter run -d chrome --dart-define=SITE=shop`.
 - The cart lives on the device: in the browser's `localStorage` under `bb.cart`, and in memory in the iOS and Android apps, where it lasts while the app is open. **Check out** makes a Shopify cart and opens Shopify's checkout page; on the web it takes the tab. Shopify deletes a cart once its order is placed, so when the buyer comes back the app sees that and takes the bought shirts out of its cart. Prices and sold-out sizes are checked again each time the cart opens.
 
 ## Color schemes
@@ -100,7 +101,9 @@ node tools/build_hosting.mjs
 firebase deploy --only hosting,firestore
 ```
 
-`build_hosting.mjs` copies the app to `build/hosting`, then the plain pages. It stops if a file in `website/` would overwrite an app file.
+`build_hosting.mjs` copies the app to `build/hosting`, then the plain pages, and makes Battle Shop's copy in `build/hosting-shop`. It stops if a file in `website/` would overwrite an app file. `firebase deploy --only hosting` puts both sites up; `--only hosting:battlebaseball-prod` or `--only hosting:battlebaseball-shop` deploys one.
+
+Battle Shop's site was set up once: `firebase hosting:sites:create battlebaseball-shop`, then `shop.getbattleplan.app` added to it as a custom domain in the Firebase console, with a DNS-only CNAME `shop` to `battlebaseball-shop.web.app` in Cloudflare.
 
 There's no dev environment yet: this deploys straight to production.
 
