@@ -4,9 +4,10 @@
 // store (data/shop.dart), and paying happens on Shopify's checkout page.
 // Until the Shopify store opens to the public this is a "Coming soon" page.
 //
-// Battle Shop (/shop, /shop/<handle>, /shop/cart) is the same shop on its
-// own: these screens under their own name and header, with no way into the
-// rest of the app. ShopSite says which of the two a screen is showing in.
+// Battle Shop is the same shop on a site of its own (data/site.dart), at
+// that site's front page, with a shirt at /<handle> and the cart at /cart:
+// these screens under their own name and header, with no way into the rest
+// of the app. ShopSite says which of the two a screen is showing in.
 import 'dart:async';
 
 import 'package:battle_baseball/data/repo.dart';
@@ -34,21 +35,21 @@ class ShopSite {
   /// Merch, a part of the Battle Baseball app.
   static const merch = ShopSite._(root: '/merch', title: 'Merch', back: 'Merch', standalone: false);
 
-  /// Battle Shop: nothing of the Battle Baseball app around it, and no
-  /// link into it.
-  static const battleShop = ShopSite._(root: '/shop', title: 'Battle Shop', back: 'Shop', standalone: true);
+  /// Battle Shop: a site of its own, with nothing of the Battle Baseball
+  /// app around it and no link into it. The shop is its front page.
+  static const battleShop = ShopSite._(root: '', title: 'Battle Shop', back: 'Shop', standalone: true);
 
-  /// The shop's own address; a shirt is at `<root>/<handle>` and the cart
-  /// at `<root>/cart`.
+  /// Where the shop's addresses start; a shirt is at `<root>/<handle>` and
+  /// the cart at `<root>/cart`.
   final String root;
+
+  /// The shop's first page.
+  String get home => root.isEmpty ? '/' : root;
   final String title;
 
   /// What the back link on a shirt's page and the cart says.
   final String back;
   final bool standalone;
-
-  /// Whether [path] is one of this shop's addresses.
-  bool holds(String path) => path == root || path.startsWith('$root/');
 
   /// Merch, unless a [BattleShopShell] is above.
   static ShopSite of(BuildContext context) =>
@@ -107,7 +108,7 @@ class _BattleShopBar extends StatelessWidget {
                 child: Row(
                   children: [
                     Pressable(
-                      onTap: () => context.go(ShopSite.battleShop.root),
+                      onTap: () => context.go(ShopSite.battleShop.home),
                       label: 'Battle Shop, all shirts',
                       builder: (context, down, focused) => const Wordmark(height: 46.4, second: 'Shop'),
                     ),
@@ -131,7 +132,7 @@ class ShopNotFound extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final site = ShopSite.of(context);
-    return site.standalone ? NotFoundScreen(label: site.title, path: site.root) : const NotFoundScreen();
+    return site.standalone ? NotFoundScreen(label: site.title, path: site.home) : const NotFoundScreen();
   }
 }
 
@@ -1087,7 +1088,7 @@ class _CartScreenState extends State<CartScreen> {
               if (lines.isEmpty) ...[
                 const Quiet('Nothing in your cart yet.'),
                 const SizedBox(height: 6),
-                TextLink(site.standalone ? 'Back to the shop' : 'Shop merch', onTap: () => context.go(site.root)),
+                TextLink(site.standalone ? 'Back to the shop' : 'Shop merch', onTap: () => context.go(site.home)),
               ] else ...[
                 for (final l in lines)
                   Padding(padding: const EdgeInsets.only(bottom: 10), child: _CartRow(l)),

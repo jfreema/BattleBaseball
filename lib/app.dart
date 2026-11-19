@@ -3,6 +3,7 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:battle_baseball/data/repo.dart';
 import 'package:battle_baseball/data/session.dart';
 import 'package:battle_baseball/data/shop.dart';
+import 'package:battle_baseball/data/site.dart';
 import 'package:battle_baseball/design/bb.dart';
 import 'package:battle_baseball/screens/account.dart';
 import 'package:battle_baseball/screens/admin.dart';
@@ -16,7 +17,6 @@ import 'package:battle_baseball/screens/leaderboards.dart';
 import 'package:battle_baseball/screens/merch.dart';
 import 'package:battle_baseball/screens/players.dart';
 import 'package:battle_baseball/screens/staff.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -29,14 +29,40 @@ bool _needsSignIn(String path) =>
     path.startsWith('/players/') && path.endsWith('/edit') ||
     path.startsWith('/events/') && path.endsWith('/reserve');
 
-final router = GoRouter(
+/// The app's routes, or Battle Shop's on its own site.
+final router = Site.isShop ? battleShopRouter() : _appRouter();
+
+/// Battle Shop's site has the shop and nothing else: its front page, a
+/// shirt's page and the cart, in Battle Shop's own frame. None of the app's
+/// screens has an address here, and nothing waits on a sign-in.
+GoRouter battleShopRouter({String? initialLocation}) => GoRouter(
+      initialLocation: initialLocation,
+      errorBuilder: (context, state) => const BattleShopShell(child: ShopNotFound()),
+      routes: [
+        ShellRoute(
+          builder: (context, state, child) => BattleShopShell(child: child),
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (_, _) => const MerchScreen(),
+              routes: [
+                GoRoute(path: 'cart', builder: (_, _) => const CartScreen()),
+                GoRoute(
+                  path: ':handle',
+                  builder: (_, s) => ProductScreen(handle: s.pathParameters['handle']!),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+GoRouter _appRouter() => GoRouter(
   refreshListenable: Session.instance,
   redirect: (context, state) {
     final s = Session.instance;
     final path = state.uri.path;
-    // Battle Shop stands apart from the app: signed in or not, nobody is
-    // sent from it to one of the app's screens.
-    if (ShopSite.battleShop.holds(path)) return null;
     if (!s.ready) return null;
     if (!s.signedIn && _needsSignIn(path)) {
       return Uri(path: '/sign-in', queryParameters: {'from': state.uri.toString()}).toString();
@@ -51,9 +77,8 @@ final router = GoRouter(
     if (path.startsWith('/admin') && !s.hasStaffTools) return '/';
     return null;
   },
-  errorBuilder: (context, state) => ShopSite.battleShop.holds(state.uri.path)
-      ? const BattleShopShell(child: ShopNotFound())
-      : AppShell(location: state.uri.path, child: const NotFoundScreen()),
+  errorBuilder: (context, state) =>
+      AppShell(location: state.uri.path, child: const NotFoundScreen()),
   routes: [
     ShellRoute(
       builder: (context, state, child) => AppShell(location: state.uri.path, child: child),
@@ -118,6 +143,8 @@ final router = GoRouter(
             ),
           ],
         ),
+        // On the web Firebase sends /shop on to Battle Shop's own site first.
+        GoRoute(path: '/shop', redirect: (_, _) => '/merch'),
         GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
         GoRoute(path: '/more', redirect: (_, _) => '/account'),
         GoRoute(
@@ -148,23 +175,6 @@ final router = GoRouter(
         if (Repo.isDemo) GoRoute(path: '/dev/gallery', builder: (_, _) => const GalleryScreen()),
       ],
     ),
-    // Battle Shop: the Merch screens on their own, outside the app's shell.
-    ShellRoute(
-      builder: (context, state, child) => BattleShopShell(child: child),
-      routes: [
-        GoRoute(
-          path: ShopSite.battleShop.root,
-          builder: (_, _) => const MerchScreen(),
-          routes: [
-            GoRoute(path: 'cart', builder: (_, _) => const CartScreen()),
-            GoRoute(
-              path: ':handle',
-              builder: (_, s) => ProductScreen(handle: s.pathParameters['handle']!),
-            ),
-          ],
-        ),
-      ],
-    ),
     GoRoute(path: '/sign-in', builder: (_, _) => const SignInScreen()),
     GoRoute(path: '/sign-up', builder: (_, _) => const SignInScreen(signUp: true)),
     GoRoute(path: '/welcome', builder: (_, _) => const WelcomeScreen()),
@@ -175,7 +185,7 @@ class BattleBaseballApp extends StatelessWidget {
   const BattleBaseballApp({super.key});
   @override
   Widget build(BuildContext context) => MaterialApp.router(
-        title: 'Battle Baseball',
+        title: Site.isShop ? ShopSite.battleShop.title : 'Battle Baseball',
         debugShowCheckedModeBanner: false,
         theme: BB.theme(),
         // Rows of cards and chips scroll sideways; let a mouse drag them too.
@@ -187,56 +197,8 @@ class BattleBaseballApp extends StatelessWidget {
             PointerDeviceKind.stylus,
           },
         ),
-        builder: (context, child) => _TabTitle(child: child!),
         routerConfig: router,
       );
-}
-
-/// Names the browser tab for the address it's showing: Battle Shop on the
-/// shop's own pages, Battle Baseball everywhere else.
-class _TabTitle extends StatefulWidget {
-  const _TabTitle({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_TabTitle> createState() => _TabTitleState();
-}
-
-class _TabTitleState extends State<_TabTitle> {
-  late String _title = _titleNow();
-
-  static String _titleNow() {
-    // Before the first page is up, the address the app was opened at.
-    final shown = router.routerDelegate.currentConfiguration;
-    final path = shown.isEmpty ? router.routeInformationProvider.value.uri.path : shown.uri.path;
-    return ShopSite.battleShop.holds(path) ? ShopSite.battleShop.title : 'Battle Baseball';
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    router.routerDelegate.addListener(_moved);
-  }
-
-  @override
-  void dispose() {
-    router.routerDelegate.removeListener(_moved);
-    super.dispose();
-  }
-
-  void _moved() {
-    if (!mounted || _titleNow() == _title) return;
-    // The router can move on while widgets are building; wait that frame out.
-    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
-      SchedulerBinding.instance.addPostFrameCallback((_) => _moved());
-    } else {
-      setState(() => _title = _titleNow());
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => Title(title: _title, color: BB.field, child: widget.child);
 }
 
 /// The frame around every screen: a bottom bar with home plate in the

@@ -1,11 +1,15 @@
-// Assembles build/hosting for Firebase Hosting: the Flutter web app (build/web)
-// at the root, which is also the landing page, plus the few plain pages kept
-// as fast static HTML (website/pages/* wrapped in website/_layout.html).
-// Firebase serves a file when one matches and hands every other path to the
-// app, so /privacy is the static page and /events/abc is the app.
+// Assembles the two sites Firebase Hosting serves, from one build of the app.
 //
-// Battle Shop (/shop) is the app too, but with a front door of its own:
-// shop.html, the app's index.html under the shop's name (see below).
+// build/hosting is Battle Baseball (showcase.getbattleplan.app): the Flutter
+// web app (build/web) at the root, which is also the landing page, plus the
+// few plain pages kept as fast static HTML (website/pages/* wrapped in
+// website/_layout.html). Firebase serves a file when one matches and hands
+// every other path to the app, so /privacy is the static page and
+// /events/abc is the app.
+//
+// build/hosting-shop is Battle Shop (shop.getbattleplan.app): the same app
+// behind an index.html of its own, which tells the app to be the shop and
+// nothing else (see below).
 //
 //   flutter build web --release
 //   node tools/build_hosting.mjs
@@ -18,6 +22,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const site = join(root, "website");
 const web = join(root, "build", "web");
 const out = join(root, "build", "hosting");
+const shopOut = join(root, "build", "hosting-shop");
 
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
@@ -31,47 +36,64 @@ if (existsSync(join(web, "index.html"))) {
   console.warn("build/web is missing: run `flutter build web --release` first.");
 }
 
-// Battle Shop's front door. The app answers /shop like any other address,
-// but index.html introduces every page as Battle Baseball: the tab's title,
-// the link preview a shared address gets, and the mark on the loading
-// screen. shop.html is the same file introduced as Battle Shop. Firebase
-// serves it for /shop (clean URLs) and for /shop/** (a rewrite in
-// firebase.json), and the app takes over from there.
+// Battle Shop: the app again, as a site of its own. Its index.html is the
+// app's with Battle Shop's name in place of Battle Baseball's (the tab's
+// title, the link preview a shared address gets, the mark on the loading
+// screen) and with <meta name="bb-site" content="shop">, which the app reads
+// (lib/data/site.dart) to show the shop and none of its other screens.
 const shop = {
+  origin: "https://shop.getbattleplan.app",
   title: "Battle Shop · Battle Baseball shirts and team gear",
   short: "Battle Shop",
   description: "Battle Baseball shirts, and gear for the teams that play in its showcases. Printed to order and shipped to you.",
-  url: "https://showcase.getbattleplan.app/shop",
-  image: "https://showcase.getbattleplan.app/og-shop.png",
+  image: "og-shop.png",
   imageAlt: "Battle Shop. Shirts and team gear. Battle Baseball tees in coral and royal blue.",
 };
-if (existsSync(join(out, "index.html"))) {
-  let html = readFileSync(join(out, "index.html"), "utf8");
-  // Each line of index.html's head that names the site. A change there that
-  // one of these no longer matches stops the build, so shop.html can't
-  // quietly go out saying Battle Baseball.
+rmSync(shopOut, { recursive: true, force: true });
+if (existsSync(join(web, "index.html"))) {
+  cpSync(web, shopOut, { recursive: true });
+  let html = readFileSync(join(web, "index.html"), "utf8");
+  // Each part of index.html that names the site. A change there that one of
+  // these no longer matches stops the build, so Battle Shop can't quietly
+  // go out saying Battle Baseball.
   const set = (pattern, value) => {
-    if (!pattern.test(html)) throw new Error(`shop.html: nothing in web/index.html matches ${pattern}`);
+    if (!pattern.test(html)) throw new Error(`Battle Shop: nothing in web/index.html matches ${pattern}`);
     html = html.replace(pattern, (_, before, after) => before + value + after);
   };
   const attr = (tag, key, name, value) =>
     set(new RegExp(`(<${tag} ${key}="${name}" (?:content|href)=")[^"]*(")`), esc(value));
+  // Its own address everywhere the page gives one, the canonical link's
+  // script included.
+  set(/()https:\/\/showcase\.getbattleplan\.app()/, shop.origin);
+  html = html.replaceAll("https://showcase.getbattleplan.app", shop.origin);
   set(/(<title>)[^<]*(<\/title>)/, esc(shop.title));
   attr("meta", "name", "description", shop.description);
-  attr("link", "rel", "canonical", shop.url);
+  attr("link", "rel", "canonical", `${shop.origin}/`);
   attr("meta", "property", "og:site_name", shop.short);
   attr("meta", "property", "og:title", shop.title);
   attr("meta", "property", "og:description", shop.description);
-  attr("meta", "property", "og:url", shop.url);
-  attr("meta", "property", "og:image", shop.image);
+  attr("meta", "property", "og:url", `${shop.origin}/`);
+  attr("meta", "property", "og:image", `${shop.origin}/${shop.image}`);
   attr("meta", "property", "og:image:alt", shop.imageAlt);
   attr("meta", "name", "twitter:title", shop.title);
   attr("meta", "name", "twitter:description", shop.description);
-  attr("meta", "name", "twitter:image", shop.image);
+  attr("meta", "name", "twitter:image", `${shop.origin}/${shop.image}`);
   attr("meta", "name", "apple-mobile-web-app-title", shop.short);
-  // The loading screen's mark: BATTLE over SHOP.
+  // What tells the app which site it is.
+  set(/(<meta name="viewport"[^>]*>\n)()/, '  <meta name="bb-site" content="shop">\n');
+  // The loading screen: BATTLE over SHOP, and no showcase headline.
   set(/(<div class="shell-mark"><b>BATTLE<\/b><i>)BASEBALL(<\/i><\/div>)/, "SHOP");
-  writeFileSync(join(out, "shop.html"), html);
+  set(/()[ \t]*<div class="shell-home">[\s\S]*?<\/div>\n()/, "");
+  writeFileSync(join(shopOut, "index.html"), html);
+
+  const manifest = JSON.parse(readFileSync(join(web, "manifest.json"), "utf8"));
+  Object.assign(manifest, { name: shop.short, short_name: shop.short, description: shop.description });
+  writeFileSync(join(shopOut, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+  writeFileSync(join(shopOut, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${shop.origin}/sitemap.xml\n`);
+  writeFileSync(
+    join(shopOut, "sitemap.xml"),
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${shop.origin}/</loc></url>\n</urlset>\n`,
+  );
 }
 
 // Static files beside it, copied as they are. None may replace an app file.
@@ -88,7 +110,6 @@ for (const name of readdirSync(site)) {
 const layout = readFileSync(join(site, "_layout.html"), "utf8");
 for (const file of readdirSync(join(site, "pages")).filter((f) => f.endsWith(".html"))) {
   if (file === "index.html") throw new Error("The home page is the app: remove website/pages/index.html");
-  if (file === "shop.html") throw new Error("Battle Shop is the app: remove website/pages/shop.html");
   let body = readFileSync(join(site, "pages", file), "utf8");
   const meta = {};
   body = body.replace(/^\s*<!--\s*(\w+):\s*([\s\S]*?)\s*-->\s*\n/gm, (_, k, v) => {
@@ -111,3 +132,4 @@ for (const file of readdirSync(join(site, "pages")).filter((f) => f.endsWith(".h
 }
 
 console.log(`Built ${out}`);
+console.log(`Built ${shopOut}`);

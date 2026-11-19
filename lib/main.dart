@@ -3,6 +3,7 @@ import 'package:battle_baseball/data/demo.dart';
 import 'package:battle_baseball/data/repo.dart';
 import 'package:battle_baseball/data/scheme.dart';
 import 'package:battle_baseball/data/session.dart';
+import 'package:battle_baseball/data/site.dart';
 import 'package:battle_baseball/firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -29,7 +30,8 @@ Future<void> main() async {
     await FirebaseAuth.instance.useAuthEmulator('localhost', 9199);
     FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8181);
   }
-  Session.instance; // starts listening for sign-in
+  // Battle Shop has no accounts, so nobody is signed in there.
+  if (!Site.isShop) Session.instance; // starts listening for sign-in
   await SchemeController.instance.start(); // the colors an admin picked
   runApp(const BattleBaseballApp());
 }
