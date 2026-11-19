@@ -3,6 +3,10 @@
 // (/merch/cart). The shirts, prices and sizes are read from the Shopify
 // store (data/shop.dart), and paying happens on Shopify's checkout page.
 // Until the Shopify store opens to the public this is a "Coming soon" page.
+//
+// Battle Shop (/shop, /shop/<handle>, /shop/cart) is the same shop on its
+// own: these screens under their own name and header, with no way into the
+// rest of the app. ShopSite says which of the two a screen is showing in.
 import 'dart:async';
 
 import 'package:battle_baseball/data/repo.dart';
@@ -21,6 +25,115 @@ const merchItems = <({String name, String image})>[
   (name: 'Military Green Tee', image: 'assets/merch/military-green-tee.jpg'),
   (name: 'Royal Blue Tee', image: 'assets/merch/royal-blue-tee.jpg'),
 ];
+
+/// Where the shop is showing: in the Battle Baseball app as Merch, or on
+/// its own as Battle Shop. The screens ask it for their addresses and names.
+class ShopSite {
+  const ShopSite._({required this.root, required this.title, required this.back, required this.standalone});
+
+  /// Merch, a part of the Battle Baseball app.
+  static const merch = ShopSite._(root: '/merch', title: 'Merch', back: 'Merch', standalone: false);
+
+  /// Battle Shop: nothing of the Battle Baseball app around it, and no
+  /// link into it.
+  static const battleShop = ShopSite._(root: '/shop', title: 'Battle Shop', back: 'Shop', standalone: true);
+
+  /// The shop's own address; a shirt is at `<root>/<handle>` and the cart
+  /// at `<root>/cart`.
+  final String root;
+  final String title;
+
+  /// What the back link on a shirt's page and the cart says.
+  final String back;
+  final bool standalone;
+
+  /// Whether [path] is one of this shop's addresses.
+  bool holds(String path) => path == root || path.startsWith('$root/');
+
+  /// Merch, unless a [BattleShopShell] is above.
+  static ShopSite of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_ShopSiteScope>()?.site ?? merch;
+}
+
+class _ShopSiteScope extends InheritedWidget {
+  const _ShopSiteScope({required this.site, required super.child});
+
+  final ShopSite site;
+
+  @override
+  bool updateShouldNotify(_ShopSiteScope old) => old.site != site;
+}
+
+/// The frame around Battle Shop's screens, in place of the app's shell: no
+/// tabs, no sign-in and no way Home. On desktop a bar with the Battle Shop
+/// mark and the Cart; on phones each screen's own header carries them.
+class BattleShopShell extends StatelessWidget {
+  const BattleShopShell({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => _ShopSiteScope(
+        site: ShopSite.battleShop,
+        child: Scaffold(
+          body: BB.isWide(context)
+              ? Column(
+                  children: [
+                    // Like the app's top bar, its words only grow so far.
+                    MediaQuery.withClampedTextScaling(maxScaleFactor: 1.15, child: const _BattleShopBar()),
+                    Expanded(child: MediaQuery.removePadding(context: context, removeTop: true, child: child)),
+                  ],
+                )
+              : child,
+        ),
+      );
+}
+
+/// Battle Shop's desktop bar, the size and place of the app's top bar: the
+/// mark, which leads to the shop's first page, and the Cart.
+class _BattleShopBar extends StatelessWidget {
+  const _BattleShopBar();
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 84,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Row(
+                  children: [
+                    Pressable(
+                      onTap: () => context.go(ShopSite.battleShop.root),
+                      label: 'Battle Shop, all shirts',
+                      builder: (context, down, focused) => const Wordmark(height: 46.4, second: 'Shop'),
+                    ),
+                    if (Repo.stampDemo) ...[const SizedBox(width: 22), const Stamp('SAMPLE DATA')],
+                    const Spacer(),
+                    const CartButton(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+/// What an address in the shop that leads nowhere shows. Battle Shop's way
+/// out is its own first page.
+class ShopNotFound extends StatelessWidget {
+  const ShopNotFound({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final site = ShopSite.of(context);
+    return site.standalone ? NotFoundScreen(label: site.title, path: site.root) : const NotFoundScreen();
+  }
+}
 
 /// Home's Merch section: two shirts from the shop and a way in, or the
 /// coming-soon shirts until the shop opens.
@@ -73,20 +186,51 @@ class _MerchSectionState extends State<MerchSection> {
       );
 }
 
-/// The top of a shop screen: back, the sample stamp, and the cart.
+/// The top of a shop screen: back, the sample stamp, and the cart. Battle
+/// Shop's first page has nowhere to go back to, so its mark stands there.
 class _ShopHeader extends StatelessWidget {
-  const _ShopHeader(this.back, {this.cart = true});
+  const _ShopHeader({this.top = false, this.cart = true});
 
-  final String back;
+  /// The shop's first page, not a shirt or the cart.
+  final bool top;
   final bool cart;
 
   @override
-  Widget build(BuildContext context) => BackHeader(
-        back,
-        beside: Repo.stampDemo && !BB.isWide(context) ? const Stamp('SAMPLE') : null,
-        // An empty box keeps BackHeader from putting its own stamp there.
-        trailing: cart ? const CartButton() : const SizedBox.shrink(),
+  Widget build(BuildContext context) {
+    final site = ShopSite.of(context);
+    final wide = BB.isWide(context);
+    final stamp = Repo.stampDemo && !wide ? const Stamp('SAMPLE') : null;
+    // On desktop Battle Shop's bar already has the Cart.
+    final withCart = cart && !(site.standalone && wide);
+    if (site.standalone && top) {
+      // The bar above carries the mark; this is the little air under it.
+      if (wide) return const SizedBox(height: 12);
+      return SizedBox(
+        height: 62,
+        child: Row(
+          children: [
+            const Wordmark(second: 'Shop'),
+            // The stamp gives way on a narrow phone, so the Cart always fits.
+            Expanded(
+              child: stamp == null
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: stamp),
+                    ),
+            ),
+            if (withCart) const CartButton(),
+          ],
+        ),
       );
+    }
+    return BackHeader(
+      top ? 'Home' : site.back,
+      beside: stamp,
+      // An empty box keeps BackHeader from putting its own stamp there.
+      trailing: withCart ? const CartButton() : const SizedBox.shrink(),
+    );
+  }
 }
 
 /// A shop screen whose header stays put while the rest scrolls under it,
@@ -141,7 +285,7 @@ class CartButton extends StatelessWidget {
             semanticLabel: n == 0 ? 'Cart' : 'Cart, $n ${n == 1 ? 'item' : 'items'}',
             small: true,
             icon: const BBIcon(BBGlyph.bag),
-            onPressed: () => context.go('/merch/cart'),
+            onPressed: () => context.go('${ShopSite.of(context).root}/cart'),
           );
         },
       );
@@ -167,21 +311,23 @@ class _MerchScreenState extends State<MerchScreen> {
         builder: (context, _) {
           final shop = Shop.instance;
           final wide = BB.isWide(context);
+          // Battle Shop's mark is its title; Merch says where in the app you are.
+          final title = ShopSite.of(context).standalone ? const SizedBox(height: 8) : const PageTitle('Merch');
           return switch (shop.status) {
-            ShopStatus.loading => const PageFrame(
-                children: [_ShopHeader('Home', cart: false), PageTitle('Merch'), LoadingField()],
+            ShopStatus.loading => PageFrame(
+                children: [const _ShopHeader(top: true, cart: false), title, const LoadingField()],
               ),
-            ShopStatus.failed => _DidNotLoad(onRetry: () => shop.load(force: true)),
+            ShopStatus.failed => _DidNotLoad(onRetry: () => shop.load(force: true), top: true),
             ShopStatus.ready when shop.products.isNotEmpty => _ShopFrame(
-                header: const _ShopHeader('Home'),
+                header: const _ShopHeader(top: true),
                 children: [
-                  const PageTitle('Merch'),
+                  title,
                   ..._sections(shop.sections, wide: wide),
                   const SizedBox(height: 28),
                   Text('Checkout runs on Shopify.', style: BB.bodyStyle(14.5)),
                 ],
               ),
-            _ => const _ComingSoon(),
+            _ => const _ComingSoon(top: true),
           };
         },
       );
@@ -219,16 +365,16 @@ List<Widget> _sections(List<ShopSection> sections, {required bool wide}) {
 
 /// What the shop shows before the Shopify store is open.
 class _ComingSoon extends StatelessWidget {
-  const _ComingSoon({this.back = 'Home'});
+  const _ComingSoon({this.top = false});
 
-  final String back;
+  final bool top;
 
   @override
   Widget build(BuildContext context) => PageFrame(
         column: 640,
         children: [
-          _ShopHeader(back, cart: false),
-          const PageTitle('Merch', trailing: Pill('Coming soon')),
+          _ShopHeader(top: top, cart: false),
+          PageTitle(ShopSite.of(context).title, trailing: const Pill('Coming soon')),
           Text(
             "Battle Baseball tees are on the way. They aren't for sale yet; check back soon.",
             style: BB.bodyStyle(16, height: 1.45),
@@ -240,17 +386,17 @@ class _ComingSoon extends StatelessWidget {
 }
 
 class _DidNotLoad extends StatelessWidget {
-  const _DidNotLoad({required this.onRetry, this.back = 'Home'});
+  const _DidNotLoad({required this.onRetry, this.top = false});
 
   final VoidCallback onRetry;
-  final String back;
+  final bool top;
 
   @override
   Widget build(BuildContext context) => PageFrame(
         column: 640,
         children: [
-          _ShopHeader(back, cart: false),
-          const PageTitle('Merch'),
+          _ShopHeader(top: top, cart: false),
+          PageTitle(ShopSite.of(context).title),
           const Quiet("The shop didn't load. Check your connection and try again."),
           const SizedBox(height: 18),
           BBButton.paper('Try again', onPressed: onRetry),
@@ -360,7 +506,7 @@ class _ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = product;
     return Paper(
-      onTap: () => context.go('/merch/${p.handle}'),
+      onTap: () => context.go('${ShopSite.of(context).root}/${p.handle}'),
       padding: const EdgeInsets.all(8),
       semanticLabel: '${p.title}, ${p.priceLabel}${p.available ? '' : ', sold out'}',
       child: Column(
@@ -478,17 +624,17 @@ class _ProductScreenState extends State<ProductScreen> {
     final p = _product;
     switch (_state) {
       case _Load.loading:
-        return const PageFrame(children: [_ShopHeader('Merch'), LoadingField()]);
+        return const PageFrame(children: [_ShopHeader(), LoadingField()]);
       case _Load.locked:
         // A shared link to a shirt: back goes up to the shop, so say so.
-        return const _ComingSoon(back: 'Merch');
+        return const _ComingSoon();
       case _Load.failed:
-        return _DidNotLoad(onRetry: _load, back: 'Merch');
+        return _DidNotLoad(onRetry: _load);
       case _Load.missing:
-        return const NotFoundScreen();
+        return const ShopNotFound();
       case _Load.ready:
     }
-    if (p == null) return const NotFoundScreen();
+    if (p == null) return const ShopNotFound();
 
     final wide = BB.isWide(context);
     final variant = p.variantFor(_picked);
@@ -601,7 +747,7 @@ class _ProductScreenState extends State<ProductScreen> {
     return _ShopFrame(
       // Phone layouts stay a phone's width on a tablet.
       maxWidth: wide ? BB.contentWidth : 560,
-      header: const _ShopHeader('Merch'),
+      header: const _ShopHeader(),
       children: [
         if (wide)
           Padding(
@@ -930,17 +1076,18 @@ class _CartScreenState extends State<CartScreen> {
         listenable: Shop.instance,
         builder: (context, _) {
           final shop = Shop.instance;
+          final site = ShopSite.of(context);
           final lines = shop.lines;
           final soldOut = lines.length - shop.buyable.length;
           return PageFrame(
             column: 640,
             children: [
-              const _ShopHeader('Merch', cart: false),
+              const _ShopHeader(cart: false),
               const PageTitle('Your cart'),
               if (lines.isEmpty) ...[
                 const Quiet('Nothing in your cart yet.'),
                 const SizedBox(height: 6),
-                TextLink('Shop merch', onTap: () => context.go('/merch')),
+                TextLink(site.standalone ? 'Back to the shop' : 'Shop merch', onTap: () => context.go(site.root)),
               ] else ...[
                 for (final l in lines)
                   Padding(padding: const EdgeInsets.only(bottom: 10), child: _CartRow(l)),
@@ -992,7 +1139,7 @@ class _CartRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Pressable(
-            onTap: () => context.go('/merch/${l.handle}'),
+            onTap: () => context.go('${ShopSite.of(context).root}/${l.handle}'),
             label: l.title,
             builder: (context, down, focused) => Container(
               width: 76,

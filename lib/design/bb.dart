@@ -1116,17 +1116,19 @@ class OutlinedText extends StatelessWidget {
 }
 
 /// BATTLE over BASEBALL, stacked. [height] is the height of the whole mark.
+/// Battle Shop's mark is the same with SHOP as its [second] word.
 class Wordmark extends StatelessWidget {
-  const Wordmark({super.key, this.height = 38});
+  const Wordmark({super.key, this.height = 38, this.second = 'Baseball'});
 
   final double height;
+  final String second;
 
   @override
   Widget build(BuildContext context) {
     // Drawn at 25 px over 12 px, 38.5 tall and about 84 wide.
     final s = height / 38.5;
     return Semantics(
-      label: 'Battle Baseball',
+      label: 'Battle $second',
       child: ExcludeSemantics(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1148,7 +1150,7 @@ class Wordmark extends StatelessWidget {
             ),
             SizedBox(height: 4 * s),
             Text(
-              'BASEBALL',
+              second.toUpperCase(),
               textScaler: TextScaler.noScaling,
               style: TextStyle(
                 fontFamily: BB.stencil,

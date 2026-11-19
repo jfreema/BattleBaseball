@@ -41,7 +41,8 @@ Future<void> _loadAppFonts() async {
 }
 
 /// The shop's routes as lib/app.dart has them, with Home's Merch section at
-/// the root, inside a Scaffold as AppShell puts them.
+/// the root, inside a Scaffold as AppShell puts them. Battle Shop's are
+/// beside them, in its own shell.
 GoRouter _router(String location) => GoRouter(
       initialLocation: location,
       routes: [
@@ -59,8 +60,27 @@ GoRouter _router(String location) => GoRouter(
             ),
           ],
         ),
+        ShellRoute(
+          builder: (_, _, child) => BattleShopShell(child: child),
+          routes: [
+            GoRoute(
+              path: '/shop',
+              builder: (_, _) => const MerchScreen(),
+              routes: [
+                GoRoute(path: 'cart', builder: (_, _) => const CartScreen()),
+                GoRoute(path: ':handle', builder: (_, s) => ProductScreen(handle: s.pathParameters['handle']!)),
+              ],
+            ),
+          ],
+        ),
       ],
     );
+
+/// The address the app opened by [_open] is showing now.
+String _location(WidgetTester t) =>
+    GoRouter.of(t.element(find.byType(PageFrame).first)).routerDelegate.currentConfiguration.uri.path;
+
+Finder _mark(String second) => find.byWidgetPredicate((w) => w is Wordmark && w.second == second);
 
 /// Opens the app at [location] in a window [size] logical pixels big, with
 /// text scaled by [text].
@@ -587,6 +607,165 @@ void main() {
     Shop.instance = Shop(_Store()..error = const ShopLocked());
     await _open(t, '/merch/$_tropic');
     expect(find.byWidgetPredicate((w) => w is BackHeader && w.label == 'Merch'), findsOneWidget);
+    await _close(t);
+  });
+
+  // --- Battle Shop: the same shop on its own, at /shop ---
+
+  testWidgets('Battle Shop lists the same shirts under its own mark, with no way Home', (t) async {
+    for (final size in [_phone, _desktop]) {
+      Shop.instance = Shop(_Teams());
+      await _fillCart();
+      await _open(t, '/shop', size: size);
+      final at = '${size.width.round()} wide';
+      expect(t.takeException(), isNull, reason: at);
+      expect(_mark('Shop'), findsOneWidget, reason: at);
+      expect(_mark('Baseball'), findsNothing, reason: at);
+      expect(find.byType(BackHeader), findsNothing, reason: 'nothing to go back to, $at');
+      expect(find.text('Home'), findsNothing, reason: at);
+      expect(find.text('Merch'), findsNothing, reason: at);
+      expect(find.text('Cart · 3'), findsOneWidget, reason: at);
+      _expectReadingOrder(t, [
+        'Battle Baseball',
+        'Battle Baseball Tee - True Royal',
+        'Special Edition',
+        'Battle Baseball Special Edition Tee - Coral (Adult)',
+        'Participating teams',
+        'Cyclones',
+        'Cyclones Hoodie',
+      ]);
+      expect(find.text('Checkout runs on Shopify.'), findsOneWidget, reason: at);
+      await _close(t);
+    }
+  });
+
+  testWidgets("Battle Shop's shirts, cart and back links keep to /shop", (t) async {
+    for (final size in [_phone, _desktop]) {
+      Shop.instance = Shop(SampleShop());
+      final at = '${size.width.round()} wide';
+      await _open(t, '/shop', size: size);
+      await _tap(t, find.text('Battle Baseball Tee - Tropic Blue'));
+      expect(_location(t), '/shop/$_tropic', reason: at);
+      expect(find.text('Add to cart'), findsOneWidget, reason: at);
+      expect(find.byWidgetPredicate((w) => w is BackHeader && w.label == 'Shop'), findsOneWidget, reason: at);
+
+      await _tap(t, find.text('YM'));
+      await _tap(t, find.text('Add to cart'));
+      await _tap(t, find.text('Cart · 1'));
+      expect(_location(t), '/shop/cart', reason: at);
+      expect(find.text('Your cart'), findsOneWidget, reason: at);
+      expect(find.text('Size YM'), findsOneWidget, reason: at);
+
+      // The line's photo leads back to the shirt, and its back link to the shop.
+      await _tap(t, _pressable('Battle Baseball Tee - Tropic Blue'));
+      expect(_location(t), '/shop/$_tropic', reason: at);
+      await _tap(t, _pressable('Back to Shop'));
+      expect(_location(t), '/shop', reason: at);
+      expect(find.text('Special Edition'), findsOneWidget, reason: at);
+      expect(t.takeException(), isNull, reason: at);
+      await _close(t);
+    }
+  });
+
+  testWidgets("Battle Shop's empty cart and missing shirts lead back to the shop, not Home", (t) async {
+    await _open(t, '/shop/cart');
+    expect(find.text('Nothing in your cart yet.'), findsOneWidget);
+    expect(find.text('Shop merch'), findsNothing);
+    await _tap(t, find.text('Back to the shop'));
+    expect(_location(t), '/shop');
+    await _close(t);
+
+    await _open(t, '/shop/no-such-shirt');
+    expect(find.text('Nothing here.'), findsOneWidget);
+    expect(find.text('Home'), findsNothing);
+    await _tap(t, find.text('Battle Shop'));
+    expect(_location(t), '/shop');
+    expect(find.text('Battle Baseball Tee - Tropic Blue'), findsOneWidget);
+    expect(t.takeException(), isNull);
+    await _close(t);
+  });
+
+  testWidgets("on a phone Battle Shop's mark and Cart stay at the top while the shop scrolls", (t) async {
+    Shop.instance = Shop(_Teams());
+    await _fillCart();
+    await _open(t, '/shop');
+    final cart = find.text('Cart · 3'), mark = _mark('Shop');
+    final cartAt = t.getRect(cart), markAt = t.getRect(mark);
+    await t.drag(find.byType(SingleChildScrollView).first, const Offset(0, -400));
+    await _settle(t);
+    expect(t.state<ScrollableState>(find.byType(Scrollable).first).position.pixels, greaterThan(50));
+    expect(t.getRect(cart), cartAt);
+    expect(t.getRect(mark), markAt);
+    expect(t.takeException(), isNull);
+    await _close(t);
+  });
+
+  testWidgets('while the store is locked Battle Shop says Coming soon under its own name', (t) async {
+    for (final location in ['/shop', '/shop/$_tropic']) {
+      Shop.instance = Shop(_Store()..error = const ShopLocked());
+      await _open(t, location);
+      expect(find.text('Battle Shop'), findsOneWidget, reason: location);
+      expect(find.text('Coming soon'), findsOneWidget, reason: location);
+      expect(find.text('Merch'), findsNothing, reason: location);
+      expect(find.text('Home'), findsNothing, reason: location);
+      expect(t.takeException(), isNull, reason: location);
+      await _close(t);
+    }
+  });
+
+  testWidgets('Battle Shop lays out on a phone, a narrow phone and a desktop, at 1x and 1.5x text, with sample data too',
+      (t) async {
+    addTearDown(() => Repo.instance = Repo());
+    for (final demo in [false, true]) {
+      Repo.instance = demo ? DemoRepo() : Repo();
+      for (final size in [_phone, _narrow, const Size(960, 700), _desktop]) {
+        for (final text in [1.0, 1.5]) {
+          for (final location in ['/shop', '/shop/$_tropic', '/shop/cart']) {
+            Shop.instance = Shop(SampleShop());
+            await _fillCart();
+            await _open(t, location, size: size, text: text);
+            final at = '$location at ${size.width.round()} wide, text x$text${demo ? ', demo' : ''}';
+            expect(t.takeException(), isNull, reason: at);
+            if (location != '/shop/cart') {
+              final cart = t.getRect(find.text('Cart · 3'));
+              expect(cart.right, lessThanOrEqualTo(size.width), reason: 'the Cart button, $at');
+              expect(cart.left, greaterThan(0), reason: 'the Cart button, $at');
+            }
+            await _close(t);
+          }
+        }
+      }
+    }
+  });
+
+  testWidgets("the app's own routes put Battle Shop outside its shell, under its own tab title", (t) async {
+    Session.demoAs = 'family'; // signed in as Jamie, with nothing read from Firebase
+    Title tabTitle() => t.widgetList<Title>(find.byType(Title)).last;
+    t.view
+      ..devicePixelRatio = 3
+      ..physicalSize = _phone * 3;
+    addTearDown(t.view.reset);
+    addTearDown(() => router.go('/'));
+
+    for (final location in ['/shop', '/shop/$_tropic', '/shop/cart', '/shop/a/b']) {
+      router.go(location);
+      await t.pumpWidget(const BattleBaseballApp());
+      await _settle(t);
+      expect(t.takeException(), isNull, reason: location);
+      expect(find.byType(BattleShopShell), findsOneWidget, reason: location);
+      expect(find.byType(AppShell), findsNothing, reason: location);
+      expect(find.text('Home'), findsNothing, reason: location);
+      expect(tabTitle().title, 'Battle Shop', reason: location);
+    }
+    expect(find.text('Nothing here.'), findsOneWidget, reason: 'an address under /shop that leads nowhere');
+
+    // Merch is still a part of the app.
+    router.go('/merch');
+    await _settle(t);
+    expect(find.byType(AppShell), findsOneWidget);
+    expect(find.byType(BattleShopShell), findsNothing);
+    expect(tabTitle().title, 'Battle Baseball');
+    expect(t.takeException(), isNull);
     await _close(t);
   });
 
