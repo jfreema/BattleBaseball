@@ -8,8 +8,8 @@
 // that site's front page, with a shirt at /<handle> and the cart at /cart:
 // these screens under their own name, with no way into the rest of the app.
 // There it is dressed as a storefront: a band across the top with its mark
-// and the Cart, a headline over the shirts, and a footer. ShopSite says
-// which of the two a screen is showing in.
+// and the Cart, a ticker and a headline over the shirts, prices on gold
+// tags, and a footer. ShopSite says which of the two a screen is showing in.
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -84,11 +84,53 @@ class BattleShopShell extends StatelessWidget {
             children: [
               // Like the app's top bar, its words only grow so far.
               MediaQuery.withClampedTextScaling(maxScaleFactor: 1.15, child: const _BattleShopBar()),
-              Expanded(child: MediaQuery.removePadding(context: context, removeTop: true, child: child)),
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // The field, mown: it stays put while a page scrolls over it.
+                    ExcludeSemantics(
+                      child: RepaintBoundary(child: CustomPaint(painter: _MownPainter(BB.cream.withAlpha(0x0A)))),
+                    ),
+                    MediaQuery.removePadding(context: context, removeTop: true, child: child),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
       );
+}
+
+/// A ballpark's mowing: wide bands leaning to the right, every other one a
+/// touch lighter than the field.
+class _MownPainter extends CustomPainter {
+  const _MownPainter(this.color);
+
+  final Color color;
+
+  static const _band = 150.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final lean = size.height * 0.36;
+    final paint = Paint()..color = color;
+    canvas.clipRect(Offset.zero & size);
+    for (var x = -lean - _band; x < size.width + _band; x += _band * 2) {
+      canvas.drawPath(
+        Path()
+          ..moveTo(x + lean, 0)
+          ..lineTo(x + lean + _band, 0)
+          ..lineTo(x + _band, size.height)
+          ..lineTo(x, size.height)
+          ..close(),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_MownPainter old) => old.color != color;
 }
 
 /// The darker blue of Battle Shop's band and footer: the field with ink over
@@ -121,9 +163,9 @@ class ShopMark extends StatelessWidget {
 }
 
 /// Battle Shop's band: the mark, which leads to the shop's first page, and
-/// the Cart, over a line of stitches. 116 tall on desktop and 76 on phones,
-/// on a 3 px ink edge. tools/build_hosting.mjs draws the same band while the
-/// app loads, so keep the two in step.
+/// the Cart, over a gold stripe. 116 tall on desktop and 76 on phones, on a
+/// 3 px ink edge. tools/build_hosting.mjs draws the same band while the app
+/// loads, so keep the two in step.
 class _BattleShopBar extends StatelessWidget {
   const _BattleShopBar();
 
@@ -139,18 +181,12 @@ class _BattleShopBar extends StatelessWidget {
       padding: EdgeInsets.only(top: safe.top),
       child: SizedBox(
         height: wide ? 116 : 76,
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // The stitches run the window's whole width, just over the edge.
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: wide ? 7 : 5,
-              child: ExcludeSemantics(child: DashedRule(color: BB.coral.withAlpha(0xA6), thickness: 2)),
-            ),
-            Positioned.fill(
+            Expanded(
               child: Padding(
-                padding: EdgeInsets.only(left: safe.left, right: safe.right, bottom: wide ? 6 : 4),
+                padding: EdgeInsets.only(left: safe.left, right: safe.right),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 1200),
@@ -171,7 +207,7 @@ class _BattleShopBar extends StatelessWidget {
                                     label: 'Battle Shop, all shirts',
                                     builder: (context, down, focused) => Opacity(
                                       opacity: down ? 0.75 : 1,
-                                      child: ShopMark(height: wide ? 72 : 48),
+                                      child: ShopMark(height: wide ? 70 : 46),
                                     ),
                                   ),
                                   if (Repo.stampDemo) ...[
@@ -191,6 +227,10 @@ class _BattleShopBar extends StatelessWidget {
                 ),
               ),
             ),
+            // The stripe runs the window's whole width, between two ink lines:
+            // this one and the band's edge.
+            ColoredBox(color: BB.ink, child: const SizedBox(height: 3)),
+            ColoredBox(color: BB.coral, child: SizedBox(height: wide ? 6 : 5)),
           ],
         ),
       ),
@@ -198,9 +238,9 @@ class _BattleShopBar extends StatelessWidget {
   }
 }
 
-/// Battle Shop's footer, across the bottom of every page: the mark, a line
-/// on how the shirts are made and paid for, and whose they are. Nothing in
-/// it leads off the shop.
+/// Battle Shop's footer, across the bottom of every page: the band's gold
+/// stripe, the mark, a line on how the shirts are made and paid for, and
+/// whose they are. Nothing in it leads off the shop.
 class _ShopFooter extends StatelessWidget {
   const _ShopFooter();
 
@@ -218,32 +258,53 @@ class _ShopFooter extends StatelessWidget {
       ],
     );
     final rights = Text('© ${DateTime.now().year} Battle Baseball', style: BB.bodyStyle(13.5, height: 1.2));
-    const mark = ExcludeSemantics(child: Wordmark(height: 30, second: 'Shop'));
-    return Container(
-      decoration: BoxDecoration(
-        color: _bandColor(),
-        border: Border(top: BorderSide(color: BB.ink, width: 3)),
+    final mark = ExcludeSemantics(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset('assets/brand/tank.png', height: 30, filterQuality: FilterQuality.medium),
+          const SizedBox(width: 9),
+          const Wordmark(height: 34, second: 'Shop'),
+        ],
       ),
-      padding: EdgeInsets.fromLTRB(side + safe.left, wide ? 26 : 20, side + safe.right, (wide ? 28 : 22) + safe.bottom),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: BB.contentWidth),
-          child: wide
-              ? Row(
-                  children: [
-                    mark,
-                    const SizedBox(width: 28),
-                    Expanded(child: note),
-                    const SizedBox(width: 24),
-                    rights,
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [mark, const SizedBox(height: 12), note, const SizedBox(height: 8), rights],
-                ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ColoredBox(color: BB.ink, child: const SizedBox(height: 3)),
+        ColoredBox(color: BB.coral, child: SizedBox(height: wide ? 6 : 5)),
+        Container(
+          decoration: BoxDecoration(
+            color: _bandColor(),
+            border: Border(top: BorderSide(color: BB.ink, width: 3)),
+          ),
+          padding:
+              EdgeInsets.fromLTRB(side + safe.left, wide ? 28 : 22, side + safe.right, (wide ? 30 : 24) + safe.bottom),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: BB.contentWidth),
+              child: wide
+                  ? Row(
+                      children: [
+                        mark,
+                        const SizedBox(width: 32),
+                        Expanded(child: note),
+                        const SizedBox(width: 24),
+                        rights,
+                      ],
+                    )
+                  : SizedBox(
+                      width: double.infinity,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [mark, const SizedBox(height: 14), note, const SizedBox(height: 8), rights],
+                      ),
+                    ),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -398,9 +459,14 @@ class _ShopPage extends StatelessWidget {
     this.pinned = false,
     this.maxWidth = BB.contentWidth,
     this.column,
+    this.lead,
   });
 
   final List<Widget> children;
+
+  /// On Battle Shop's own site, what opens the page across the window's
+  /// whole width, under the band and scrolling with the rest.
+  final Widget? lead;
 
   /// The shop's first page, not a shirt or the cart.
   final bool top;
@@ -446,7 +512,8 @@ class _ShopPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        framed(SizedBox(width: double.infinity, child: header)),
+        // A lead starts right under the band.
+        if (lead == null) framed(SizedBox(width: double.infinity, child: header)),
         Expanded(
           child: LayoutBuilder(
             builder: (context, box) => SingleChildScrollView(
@@ -456,9 +523,16 @@ class _ShopPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: EdgeInsets.only(bottom: wide ? 72 : 40),
-                      child: framed(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children)),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ?lead,
+                        Padding(
+                          padding: EdgeInsets.only(bottom: wide ? 80 : 44),
+                          child: framed(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children)),
+                        ),
+                      ],
                     ),
                     const _ShopFooter(),
                   ],
@@ -531,11 +605,9 @@ class _MerchScreenState extends State<MerchScreen> {
             ShopStatus.ready when shop.products.isNotEmpty => _ShopPage(
                 top: true,
                 pinned: true,
+                lead: standalone ? _ShopFront([for (final s in shop.sections) ...s.products]) : null,
                 children: [
-                  if (standalone)
-                    _ShopHero([for (final s in shop.sections) ...s.products])
-                  else
-                    title,
+                  if (!standalone) title,
                   ..._sections(shop.sections, wide: wide, standalone: standalone),
                   // Battle Shop's footer says so on every page.
                   if (!standalone) ...[
@@ -552,8 +624,8 @@ class _MerchScreenState extends State<MerchScreen> {
 
 /// The shop's sections in order. The participating teams come last, under
 /// their own heading, each team titled a size down. On Battle Shop's own
-/// site ([standalone]) each heading runs out into a dashed rule and a team
-/// flies a pennant.
+/// site ([standalone]) each heading is underlined in gold and a team flies
+/// a pennant.
 List<Widget> _sections(List<ShopSection> sections, {required bool wide, bool standalone = false}) {
   Widget about(String text) {
     final words = Text(text, style: BB.bodyStyle(16, height: 1.45));
@@ -570,7 +642,7 @@ List<Widget> _sections(List<ShopSection> sections, {required bool wide, bool sta
   }
 
   Widget head(String text, {required double bottom}) => standalone
-      ? _RuledTitle(text, padding: EdgeInsets.only(bottom: bottom))
+      ? _ShopHeading(text, padding: EdgeInsets.only(bottom: bottom + 6))
       : SectionTitle(text, padding: EdgeInsets.only(bottom: bottom));
   Widget team(String text, {required double bottom}) {
     final name = Semantics(header: true, child: Text(text, style: BB.title(wide ? 26 : 22)));
@@ -588,13 +660,14 @@ List<Widget> _sections(List<ShopSection> sections, {required bool wide, bool sta
     );
   }
 
-  final gap = standalone ? (wide ? 56.0 : 40.0) : (wide ? 48.0 : 36.0);
+  final gap = standalone ? (wide ? 64.0 : 44.0) : (wide ? 48.0 : 36.0);
   return [
     for (final (i, s) in sections.indexed) ...[
       if (s.team && (i == 0 || !sections[i - 1].team)) ...[
         if (i > 0) SizedBox(height: gap),
-        head('Participating teams', bottom: 6),
-        about('Gear for the teams that play in Battle Baseball showcases.'),
+        // Battle Shop lets the heading speak for itself.
+        head('Participating teams', bottom: standalone ? 14 : 6),
+        if (!standalone) about('Gear for the teams that play in Battle Baseball showcases.'),
         const SizedBox(height: 4),
       ] else if (i > 0)
         SizedBox(height: s.team ? (wide ? 36 : 28) : gap),
@@ -609,10 +682,10 @@ List<Widget> _sections(List<ShopSection> sections, {required bool wide, bool sta
   ];
 }
 
-/// A section's title on Battle Shop's own site: [SectionTitle]'s words, then
-/// a dashed rule out to the page's right edge.
-class _RuledTitle extends StatelessWidget {
-  const _RuledTitle(this.text, {this.padding = const EdgeInsets.only(bottom: 16)});
+/// A section's title on Battle Shop's own site: [SectionTitle]'s words a
+/// size up, on a stroke of gold marker as wide as they are.
+class _ShopHeading extends StatelessWidget {
+  const _ShopHeading(this.text, {this.padding = const EdgeInsets.only(bottom: 22)});
 
   final String text;
   final EdgeInsetsGeometry padding;
@@ -622,32 +695,255 @@ class _RuledTitle extends StatelessWidget {
     final wide = BB.isWide(context);
     return Padding(
       padding: padding,
-      child: LayoutBuilder(
-        builder: (context, box) => Row(
-          children: [
-            // A long title keeps the row; the rule takes what's left.
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: math.max(0, box.maxWidth - (wide ? 80 : 44))),
-              child: Semantics(header: true, child: Text(text, style: BB.title(wide ? 34 : 28, drop: 3))),
-            ),
-            SizedBox(width: wide ? 18 : 12),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: DashedRule(color: BB.dashed, thickness: 2.5),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: IntrinsicWidth(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Semantics(header: true, child: Text(text, style: BB.title(wide ? 36 : 29, drop: 3))),
+              SizedBox(height: wide ? 5 : 4),
+              ExcludeSemantics(
+                child: CustomPaint(
+                  size: Size(double.infinity, wide ? 11 : 9),
+                  painter: _MarkerPainter(color: BB.coral, ink: BB.ink),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// What opens Battle Shop's first page: "Shirts and team gear." with a line
-/// under it and what a shopper can count on, and on desktop two shirts from
-/// the shop laid out like cards, as on its link preview (web/og-shop.png).
-class _ShopHero extends StatelessWidget {
+/// One pass of a marker under a heading: a gold stroke that lifts a little
+/// toward its right end, outlined in ink like everything on the field.
+class _MarkerPainter extends CustomPainter {
+  const _MarkerPainter({required this.color, required this.ink});
+
+  final Color color, ink;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final h = size.height, w = size.width;
+    final t = h * 0.48;
+    final stroke = Path()
+      ..moveTo(t, h * 0.62)
+      ..cubicTo(w * 0.3, h * 0.36, w * 0.68, h * 0.34, w - t, h * 0.5);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas
+      ..drawPath(
+        stroke,
+        paint
+          ..color = ink
+          ..strokeWidth = t * 2,
+      )
+      ..drawPath(
+        stroke,
+        paint
+          ..color = color
+          ..strokeWidth = t * 2 - 4.5,
+      );
+  }
+
+  @override
+  bool shouldRepaint(_MarkerPainter old) => old.color != color || old.ink != ink;
+}
+
+/// A star with [points] points, [inner] of the way in between them: five
+/// for the ticker's stars, four thin ones for a sparkle. Outlined in ink
+/// when [stroke] is set.
+class _Star extends StatelessWidget {
+  const _Star({required this.size, required this.color, this.points = 5, this.inner = 0.46, this.stroke = 0});
+
+  final double size;
+  final Color color;
+  final int points;
+  final double inner;
+  final double stroke;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+        size: Size.square(size),
+        painter: _SpikesPainter(points: points, inner: inner, fill: color, ink: BB.ink, stroke: stroke),
+      );
+}
+
+/// A star or a starburst: [points] spikes around a circle, turning with
+/// [turn] (in whole turns), on an ink lip [lip] deep.
+class _SpikesPainter extends CustomPainter {
+  _SpikesPainter({
+    required this.points,
+    required this.inner,
+    required this.fill,
+    required this.ink,
+    this.stroke = 0,
+    this.lip = 0,
+    this.turn,
+    this.turns = 1,
+  }) : super(repaint: turn);
+
+  final int points;
+  final double inner;
+  final Color fill, ink;
+  final double stroke, lip;
+  final Animation<double>? turn;
+
+  /// How many times the shape goes round for one of [turn]'s.
+  final int turns;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.width / 2 - stroke / 2;
+    final c = Offset(size.width / 2, size.width / 2);
+    final start = -math.pi / 2 + (turn?.value ?? 0) * turns * 2 * math.pi;
+    final path = Path();
+    for (var i = 0; i < points * 2; i++) {
+      final a = start + i * math.pi / points;
+      final at = c + Offset(math.cos(a), math.sin(a)) * (i.isEven ? r : r * inner);
+      i == 0 ? path.moveTo(at.dx, at.dy) : path.lineTo(at.dx, at.dy);
+    }
+    path.close();
+    final line = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = stroke
+      ..color = ink;
+    if (lip > 0) {
+      final under = path.shift(Offset(0, lip));
+      canvas.drawPath(under, Paint()..color = ink);
+      if (stroke > 0) canvas.drawPath(under, line);
+    }
+    canvas.drawPath(path, Paint()..color = fill);
+    if (stroke > 0) canvas.drawPath(path, line);
+  }
+
+  @override
+  bool shouldRepaint(_SpikesPainter old) =>
+      old.points != points ||
+      old.inner != inner ||
+      old.fill != fill ||
+      old.ink != ink ||
+      old.stroke != stroke ||
+      old.lip != lip ||
+      old.turn != turn;
+}
+
+/// What opens Battle Shop's first page, across the window's whole width:
+/// the ticker, then the headline and the shirts on their rays.
+class _ShopFront extends StatelessWidget {
+  const _ShopFront(this.products);
+
+  /// The shop's shirts in the order it lists them.
+  final List<ShopProduct> products;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [const ShopTicker(), _ShopHero(products)],
+      );
+}
+
+/// What a shopper can count on, running right to left across an ink strip
+/// under the band the way a scoreboard's ribbon does. It stands still for
+/// anyone who has asked their device for less motion.
+class ShopTicker extends StatefulWidget {
+  const ShopTicker({super.key});
+
+  /// The first three are the shop's promises, which a shirt's page lists too.
+  static const lines = ['Printed to order', 'Shipped to you', 'Secure checkout on Shopify', 'Gear up for game day'];
+
+  @override
+  State<ShopTicker> createState() => _ShopTickerState();
+}
+
+class _ShopTickerState extends State<ShopTicker> with SingleTickerProviderStateMixin {
+  // One pass of the lines takes this long, however wide the window.
+  late final _run = AnimationController(vsync: this, duration: const Duration(seconds: 26));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _run.stop();
+    } else if (!_run.isAnimating) {
+      _run.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _run.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = BB.isWide(context);
+    // Its words grow with the reader's text, a little.
+    final grow = (MediaQuery.textScalerOf(context).scale(100) / 100).clamp(1.0, 1.3);
+    final style = BB.lilita((wide ? 16 : 14.5) * grow, color: BB.cream).copyWith(letterSpacing: 1.1);
+    final pass = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final line in ShopTicker.lines) ...[
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: wide ? 20 : 15),
+            child: Text(
+              line.toUpperCase(),
+              maxLines: 1,
+              softWrap: false,
+              textScaler: TextScaler.noScaling,
+              style: style,
+            ),
+          ),
+          _Star(size: (wide ? 14 : 12.5) * grow, color: BB.coral),
+        ],
+      ],
+    );
+    // Enough passes side by side to cover the window and one more, so
+    // sliding left by one pass lands on the same picture.
+    final passes = (MediaQuery.sizeOf(context).width / 640).ceil() + 1;
+    return Semantics(
+      label: '${ShopTicker.lines.take(3).join('. ')}.',
+      child: ExcludeSemantics(
+        child: ColoredBox(
+          color: BB.ink,
+          child: ClipRect(
+            child: SizedBox(
+              height: (wide ? 40 : 34) * grow,
+              child: OverflowBox(
+                alignment: Alignment.centerLeft,
+                minWidth: 0,
+                maxWidth: double.infinity,
+                child: RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _run,
+                    builder: (context, child) =>
+                        FractionalTranslation(translation: Offset(-_run.value / passes, 0), child: child),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [for (var i = 0; i < passes; i++) pass]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Battle Shop's headline with a line under it, on rays that turn slowly
+/// behind it. On desktop two shirts from the shop sit beside it, laid out
+/// like cards as on its link preview (web/og-shop.png), under a starburst
+/// with the shop's lowest price; on a phone the starburst sits by the
+/// headline and the shirts themselves come right after.
+class _ShopHero extends StatefulWidget {
   const _ShopHero(this.products);
 
   /// The shop's shirts in the order it lists them; the first two with a
@@ -657,36 +953,191 @@ class _ShopHero extends StatelessWidget {
   static const _line = 'Battle Baseball tees, and gear for the teams that play in its showcases.';
 
   @override
+  State<_ShopHero> createState() => _ShopHeroState();
+}
+
+class _ShopHeroState extends State<_ShopHero> with TickerProviderStateMixin {
+  /// One slow turn of the rays; the starburst goes round several times in it.
+  late final _spin = AnimationController(vsync: this, duration: const Duration(seconds: 180));
+
+  /// The shirts and the starburst arriving, once.
+  late final _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _spin.stop();
+      _enter.value = 1;
+    } else {
+      if (!_spin.isAnimating) _spin.repeat();
+      if (_enter.status == AnimationStatus.dismissed) _enter.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    _enter.dispose();
+    super.dispose();
+  }
+
+  /// The lowest price in the shop among what can be bought, as "$25".
+  String? get _from {
+    final priced = [for (final p in widget.products) if (p.available) p];
+    if (priced.isEmpty) return null;
+    final low = priced.reduce((a, b) => a.minPrice <= b.minPrice ? a : b);
+    return shopPrice(low.minPrice, low.currency);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final wide = BB.isWide(context);
-    final shown = [for (final p in products) if (p.image != null) p].take(2).toList();
-    final copy = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _ShopHeadline(),
-        SizedBox(height: wide ? 22 : 12),
-        ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: wide ? 470 : 380),
-          child: Text(_line, style: BB.bodyStyle(wide ? 20 : 16.5)),
-        ),
-        SizedBox(height: wide ? 22 : 14),
-        const _Promises(),
-      ],
+    final safe = MediaQuery.paddingOf(context);
+    final side = wide ? 40.0 : 16.0;
+    final shown = [for (final p in widget.products) if (p.image != null) p].take(2).toList();
+    final from = _from;
+    final pop = _enter.drive(CurveTween(curve: const Interval(0.45, 1, curve: Curves.easeOutBack)));
+    final words = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: wide ? 470 : 420),
+      child: Text(_ShopHero._line, style: BB.bodyStyle(wide ? 20 : 16.5, color: BB.cream.withAlpha(0xE0))),
     );
-    if (!wide) return Padding(padding: const EdgeInsets.only(top: 14, bottom: 30), child: copy);
-    return Padding(
-      padding: const EdgeInsets.only(top: 30, bottom: 52),
-      child: Row(
-        children: [
-          Expanded(child: copy),
-          if (shown.isNotEmpty) ...[
-            const SizedBox(width: 24),
-            _HeroShirts(shown),
+    return LayoutBuilder(
+      builder: (context, box) {
+        // The page's frame, which the rays aim into.
+        final frame = math.min(box.maxWidth - safe.horizontal - side * 2, BB.contentWidth);
+        final left = safe.left + side + (box.maxWidth - safe.horizontal - side * 2 - frame) / 2;
+        final right = left + frame;
+        final beside = wide && shown.isNotEmpty;
+        final Widget content;
+        if (wide) {
+          content = Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [const _ShopHeadline(), const SizedBox(height: 24), words],
+                ),
+              ),
+              if (beside) ...[
+                const SizedBox(width: 24),
+                _HeroShirts(shown, from: from, enter: _enter, spin: _spin),
+              ] else if (from != null)
+                ScaleTransition(scale: pop, child: _PriceBurst(from, size: 150, spin: _spin)),
+            ],
+          );
+        } else {
+          content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Flexible(child: _ShopHeadline()),
+                  if (from != null) ...[
+                    const SizedBox(width: 12),
+                    ScaleTransition(scale: pop, child: _PriceBurst(from, size: 98, spin: _spin)),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              words,
+            ],
+          );
+        }
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: ExcludeSemantics(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _RaysPainter(
+                      // From behind the shirts, or the starburst: beside the
+                      // phone's headline (about 232 wide), or at the frame's
+                      // right edge when the headline has shrunk to make room.
+                      focal: beside
+                          ? right - 215
+                          : wide
+                              ? right - 75
+                              : math.min(left + 293, right - 49),
+                      rise: wide ? 0.5 : 0.36,
+                      color: BB.cream.withAlpha(0x1C),
+                      turn: _spin,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(left, wide ? 44 : 22, box.maxWidth - right, wide ? 60 : 34),
+              child: content,
+            ),
           ],
-        ],
-      ),
+        );
+      },
     );
   }
+}
+
+/// Rays out of one point, every other wedge a little lighter than the
+/// field, fading with distance and toward the bottom so the page below
+/// starts on plain field. The point is [focal] pixels from the left and
+/// [rise] of the way down the box.
+class _RaysPainter extends CustomPainter {
+  _RaysPainter({required this.focal, required this.rise, required this.color, required this.turn})
+      : super(repaint: turn);
+
+  final double focal, rise;
+  final Color color;
+  final Animation<double> turn;
+
+  static const _rays = 16;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final c = Offset(focal, size.height * rise);
+    final reach = math.max(size.width, size.height) * 1.2;
+    final wedges = Path();
+    final start = turn.value * 2 * math.pi;
+    for (var i = 0; i < _rays; i++) {
+      final a = start + i * 2 * math.pi / _rays, b = a + math.pi / _rays;
+      wedges
+        ..moveTo(c.dx, c.dy)
+        ..lineTo(c.dx + math.cos(a) * reach, c.dy + math.sin(a) * reach)
+        ..lineTo(c.dx + math.cos(b) * reach, c.dy + math.sin(b) * reach)
+        ..close();
+    }
+    canvas
+      ..saveLayer(rect, Paint())
+      ..clipRect(rect)
+      ..drawPath(
+        wedges,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [color, color.withAlpha(0)],
+            stops: const [0.12, 1],
+          ).createShader(Rect.fromCircle(center: c, radius: math.max(size.width * 0.62, 520))),
+      )
+      ..drawRect(
+        rect,
+        Paint()
+          ..blendMode = BlendMode.dstIn
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+            stops: [0, 0.62, 1],
+          ).createShader(rect),
+      )
+      ..restore();
+  }
+
+  @override
+  bool shouldRepaint(_RaysPainter old) =>
+      old.focal != focal || old.rise != rise || old.color != color || old.turn != turn;
 }
 
 /// "Shirts and team gear." on two lines, the second on the coral slab, as
@@ -698,7 +1149,7 @@ class _ShopHeadline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wide = BB.isWide(context);
-    final size = wide ? 78.0 : 46.0;
+    final size = wide ? 84.0 : 46.0;
     final onField = BB.title(size, drop: wide ? 6 : 4).copyWith(height: 1);
     final onSlab = BB.lilita(size, height: 1).copyWith(letterSpacing: size * 0.005);
     Widget line(String text, TextStyle style) =>
@@ -740,100 +1191,236 @@ class _ShopHeadline extends StatelessWidget {
   }
 }
 
-/// What a shopper can count on, each behind a check: how the shirts are
-/// made, how they arrive and where the paying happens.
+/// What a shopper can count on, each behind a check, under Add to cart:
+/// how the shirts are made, how they arrive and where the paying happens.
 class _Promises extends StatelessWidget {
-  const _Promises({this.column = false});
+  const _Promises();
 
-  /// One under another, for a shirt's page.
-  final bool column;
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (i, text) in ShopTicker.lines.take(3).indexed)
+            Padding(
+              padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: BB.coral,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: BB.ink, width: 2),
+                    ),
+                    child: Center(child: BBIcon(BBGlyph.check, size: 13, color: BB.ink)),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(child: Text(text, style: BB.labelStyle(15.5, height: 1.2))),
+                ],
+              ),
+            ),
+        ],
+      );
+}
 
-  static const _all = ['Printed to order', 'Shipped to you', 'Secure checkout on Shopify'];
+/// The shop's lowest price on a gold starburst that turns slowly under its
+/// words: "FROM" over "$25".
+class _PriceBurst extends StatelessWidget {
+  const _PriceBurst(this.price, {required this.size, required this.spin});
+
+  final String price;
+  final double size;
+  final Animation<double> spin;
 
   @override
   Widget build(BuildContext context) {
-    Widget item(String text) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                color: BB.coral,
-                shape: BoxShape.circle,
-                border: Border.all(color: BB.ink, width: 2),
+    final lip = size * 0.05;
+    return Semantics(
+      label: 'From $price',
+      child: ExcludeSemantics(
+        child: SizedBox(
+          width: size,
+          height: size + lip,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _SpikesPainter(
+                      points: 16,
+                      inner: 0.86,
+                      fill: BB.coral,
+                      ink: BB.ink,
+                      stroke: size > 120 ? 3.5 : 3,
+                      lip: lip,
+                      turn: spin,
+                      turns: 6,
+                    ),
+                  ),
+                ),
               ),
-              child: Center(child: BBIcon(BBGlyph.check, size: 13, color: BB.ink)),
-            ),
-            const SizedBox(width: 8),
-            Flexible(child: Text(text, style: BB.labelStyle(15.5, height: 1.2))),
-          ],
-        );
-    if (column) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final (i, t) in _all.indexed) Padding(padding: EdgeInsets.only(top: i == 0 ? 0 : 8), child: item(t)),
-        ],
-      );
-    }
-    return Wrap(spacing: 20, runSpacing: 10, children: [for (final t in _all) item(t)]);
+              Positioned(
+                left: 0,
+                top: 0,
+                right: 0,
+                height: size,
+                child: Center(
+                  child: Transform.rotate(
+                    angle: -10 * math.pi / 180,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'FROM',
+                          textScaler: TextScaler.noScaling,
+                          style: BB.caps(size * 0.125, color: BB.ink, tracking: 0.16),
+                        ),
+                        SizedBox(height: size * 0.015),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: size * 0.62),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              price,
+                              maxLines: 1,
+                              softWrap: false,
+                              textScaler: TextScaler.noScaling,
+                              style: BB.lilita(size * 0.32, height: 1),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
+/// Its child a little bigger while the mouse is over it.
+class _Grow extends StatefulWidget {
+  const _Grow({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_Grow> createState() => _GrowState();
+}
+
+class _GrowState extends State<_Grow> {
+  bool _over = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+        onEnter: (_) => setState(() => _over = true),
+        onExit: (_) => setState(() => _over = false),
+        child: AnimatedScale(
+          scale: _over ? 1.04 : 1,
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOut,
+          child: widget.child,
+        ),
+      );
+}
+
 /// Two shirts from the shop as the link preview lays them out: one on kraft
-/// tipped back to the left, one on cream tipped forward over it. Each opens
-/// its shirt.
+/// tipped back to the left, one on cream tipped forward over it, with the
+/// price starburst on their corner and a few sparkles around them. They
+/// drop into place when the page opens. Each shirt opens its page.
 class _HeroShirts extends StatelessWidget {
-  const _HeroShirts(this.products);
+  const _HeroShirts(this.products, {required this.from, required this.enter, required this.spin});
 
   final List<ShopProduct> products;
 
+  /// The shop's lowest price, if anything is for sale.
+  final String? from;
+  final Animation<double> enter, spin;
+
   @override
   Widget build(BuildContext context) {
-    Widget card(ShopProduct p, {required double width, required Color color, required double degrees}) =>
-        Transform.rotate(
-          angle: degrees * math.pi / 180,
-          child: Pressable(
-            onTap: () => context.go('${ShopSite.of(context).root}/${p.handle}'),
-            label: p.title,
-            builder: (context, down, focused) => Container(
-              width: width,
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: BB.ink, width: 3.5),
-                boxShadow: [
-                  if (focused) BoxShadow(color: BB.cream, spreadRadius: 3),
-                  BoxShadow(color: BB.ink, offset: const Offset(0, 7)),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(11),
-                child: AspectRatio(aspectRatio: 1, child: ShopPhoto(p.image?.url, width: 720)),
+    Animation<double> part(double begin, double end) =>
+        enter.drive(CurveTween(curve: Interval(begin, end, curve: Curves.easeOutBack)));
+    Widget card(
+      ShopProduct p, {
+      required double width,
+      required Color color,
+      required double degrees,
+      required Animation<double> at,
+    }) =>
+        AnimatedBuilder(
+          animation: at,
+          builder: (context, child) => Opacity(
+            opacity: at.value.clamp(0, 1),
+            child: Transform.translate(
+              offset: Offset(0, 40 * (1 - at.value)),
+              child: Transform.rotate(angle: degrees * at.value * math.pi / 180, child: child),
+            ),
+          ),
+          child: _Grow(
+            child: Pressable(
+              onTap: () => context.go('${ShopSite.of(context).root}/${p.handle}'),
+              label: p.title,
+              builder: (context, down, focused) => Container(
+                width: width,
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: BB.ink, width: 3.5),
+                  boxShadow: [
+                    if (focused) BoxShadow(color: BB.cream, spreadRadius: 3),
+                    BoxShadow(color: BB.ink, offset: const Offset(0, 7)),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(11),
+                  child: AspectRatio(aspectRatio: 1, child: ShopPhoto(p.image?.url, width: 720)),
+                ),
               ),
             ),
           ),
         );
+    Widget sparkle(double size, Color color, Animation<double> at) => ExcludeSemantics(
+          child: ScaleTransition(
+            scale: at,
+            child: _Star(size: size, color: color, points: 4, inner: 0.34, stroke: 2.5),
+          ),
+        );
     final one = products.length == 1;
+    final last = part(0.45, 1);
     return SizedBox(
-      width: one ? 300 : 440,
-      height: 330,
+      width: one ? 330 : 478,
+      height: 356,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           if (!one)
             Positioned(
-              left: 4,
-              top: 6,
-              child: card(products[1], width: 250, color: BB.kraft, degrees: -6),
+              left: 36,
+              top: 4,
+              child: card(products[1], width: 252, color: BB.kraft, degrees: -6, at: part(0, 0.75)),
             ),
           Positioned(
             right: 6,
-            top: one ? 14 : 40,
-            child: card(products[0], width: 268, color: BB.cream, degrees: 4),
+            top: one ? 14 : 44,
+            child: card(products[0], width: 272, color: BB.cream, degrees: 4, at: part(0.15, 0.9)),
           ),
+          Positioned(left: one ? 4 : 10, top: one ? 2 : -14, child: sparkle(34, BB.coral, last)),
+          Positioned(right: -12, top: one ? -6 : 8, child: sparkle(24, BB.cream, last)),
+          Positioned(right: one ? -18 : -22, bottom: 30, child: sparkle(30, BB.coral, last)),
+          if (from != null)
+            Positioned(
+              left: 0,
+              bottom: 0,
+              child: ScaleTransition(scale: last, child: _PriceBurst(from!, size: 132, spin: spin)),
+            ),
         ],
       ),
     );
@@ -980,8 +1567,9 @@ class _ProductGrid extends StatelessWidget {
 }
 
 /// One product on paper: its photo, name and price. Tapping opens it. On
-/// Battle Shop's own site the card also rises on its lip under the mouse,
-/// and an arrow at its corner says it leads somewhere.
+/// Battle Shop's own site the price is a gold tag stuck on the photo's
+/// corner, an arrow on the other corner says the card leads somewhere, and
+/// under the mouse the card rises on its lip and tips a little.
 class _ProductCard extends StatefulWidget {
   const _ProductCard(this.product);
 
@@ -998,70 +1586,148 @@ class _ProductCardState extends State<_ProductCard> {
   Widget build(BuildContext context) {
     final p = widget.product;
     final site = ShopSite.of(context);
-    final price = Wrap(
-      spacing: 8,
-      runSpacing: 6,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text(p.priceLabel, style: BB.lilita(site.standalone ? 20 : 19)),
-        if (!p.available) Pill('Sold out', color: BB.kraft),
-      ],
-    );
-    final card = Paper(
-      onTap: () => context.go('${site.root}/${p.handle}'),
-      padding: const EdgeInsets.all(8),
-      // Up on a taller lip under the mouse; the room it rises into is kept
-      // free below, so nothing around it moves.
-      lip: _over ? 7 : 4,
-      semanticLabel: '${p.title}, ${p.priceLabel}${p.available ? '' : ', sold out'}',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    final label = '${p.title}, ${p.priceLabel}${p.available ? '' : ', sold out'}';
+    void open() => context.go('${site.root}/${p.handle}');
+    if (!site.standalone) {
+      return Paper(
+        onTap: open,
+        padding: const EdgeInsets.all(8),
+        semanticLabel: label,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: AspectRatio(aspectRatio: 1.1, child: ShopPhoto(p.image?.url)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 10, 4, 6),
+              // The whole name: the color that tells two tees apart comes last.
+              child: Text(p.title, style: BB.labelStyle(15.5, color: BB.ink, height: 1.2)),
+            ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+              // On a narrow card Sold out goes under the price, not over it.
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(p.priceLabel, style: BB.lilita(19)),
+                  if (!p.available) Pill('Sold out', color: BB.kraft),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final wide = BB.isWide(context);
+    // The price, and Sold out beside it, on the photo's bottom left corner.
+    // They shrink together to stay on a narrow card.
+    final tags = FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.bottomLeft,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: AspectRatio(aspectRatio: 1.1, child: ShopPhoto(p.image?.url)),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 10, 4, 6),
-            // The whole name: the color that tells two tees apart comes last.
-            child: Text(p.title, style: BB.labelStyle(site.standalone ? 16.5 : 15.5, color: BB.ink, height: 1.2)),
-          ),
-          const Spacer(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
-            // On a narrow card Sold out goes under the price, not over it.
-            child: site.standalone
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(child: price),
-                      const SizedBox(width: 6),
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: _over ? BB.coral : BB.ink,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: BB.ink, width: 2),
-                        ),
-                        child: Center(
-                          child: BBIcon(BBGlyph.forward, size: 15, color: _over ? BB.ink : BB.cream),
-                        ),
-                      ),
-                    ],
-                  )
-                : price,
-          ),
+          _PriceTag(p.priceLabel, size: wide ? 20 : 17.5),
+          if (!p.available) ...[
+            const SizedBox(width: 6),
+            Padding(padding: const EdgeInsets.only(bottom: 3), child: Pill('Sold out', color: BB.kraft)),
+          ],
         ],
       ),
     );
-    if (!site.standalone) return card;
     return MouseRegion(
       onEnter: (_) => setState(() => _over = true),
       onExit: (_) => setState(() => _over = false),
-      child: Padding(padding: EdgeInsets.only(top: _over ? 0 : 3), child: card),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: _over ? 1 : 0),
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOut,
+        // Up on a taller lip under the mouse; the room it rises into is kept
+        // free above, so nothing around it moves.
+        builder: (context, lift, _) => Padding(
+          padding: EdgeInsets.only(top: 5 * (1 - lift)),
+          child: Transform.rotate(
+            angle: -0.8 * lift * math.pi / 180,
+            child: Paper(
+              onTap: open,
+              padding: const EdgeInsets.all(8),
+              lip: 4 + 5 * lift,
+              semanticLabel: label,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: AspectRatio(aspectRatio: 1.1, child: ShopPhoto(p.image?.url)),
+                      ),
+                      Positioned(left: 8, right: wide ? 50 : 44, bottom: 9, child: tags),
+                      Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: Container(
+                          width: wide ? 34 : 30,
+                          height: wide ? 34 : 30,
+                          decoration: BoxDecoration(
+                            color: Color.lerp(BB.ink, BB.coral, lift),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: BB.ink, width: 2.5),
+                          ),
+                          child: Center(
+                            child: BBIcon(
+                              BBGlyph.forward,
+                              size: wide ? 16 : 14,
+                              color: Color.lerp(BB.cream, BB.ink, lift),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 11, 4, 5),
+                    // The whole name: the color that tells two tees apart comes last.
+                    child: Text(p.title, style: BB.labelStyle(wide ? 17 : 15.5, color: BB.ink, height: 1.2)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
+}
+
+/// A price on Battle Shop's own site: a gold tag with an ink edge, stuck on
+/// a little crooked.
+class _PriceTag extends StatelessWidget {
+  const _PriceTag(this.label, {required this.size});
+
+  final String label;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Transform.rotate(
+        angle: -3 * math.pi / 180,
+        child: Container(
+          padding: EdgeInsets.fromLTRB(size * 0.55, size * 0.15, size * 0.55, size * 0.25),
+          decoration: BoxDecoration(
+            color: BB.coral,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: BB.ink, width: size > 22 ? 3 : 2.5),
+            boxShadow: BB.lip(size > 22 ? 4 : 3),
+          ),
+          child: Text(label, maxLines: 1, softWrap: false, style: BB.lilita(size, height: 1.1)),
+        ),
+      );
 }
 
 /// One shirt: photos, the price, sizes to pick, and Add to cart.
@@ -1186,10 +1852,19 @@ class _ProductScreenState extends State<ProductScreen> {
           children: [
             Semantics(
               liveRegion: true,
-              child: Text(
-                variant == null ? p.priceLabel : shopPrice(variant.price, p.currency),
-                style: BB.title(wide ? 30 : 26, drop: 3),
-              ),
+              // Battle Shop tags its prices; Merch prints them on the field.
+              child: standalone
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 4, bottom: 4),
+                      child: _PriceTag(
+                        variant == null ? p.priceLabel : shopPrice(variant.price, p.currency),
+                        size: wide ? 27 : 24,
+                      ),
+                    )
+                  : Text(
+                      variant == null ? p.priceLabel : shopPrice(variant.price, p.currency),
+                      style: BB.title(wide ? 30 : 26, drop: 3),
+                    ),
             ),
             if (was != null && variant != null && was > variant.price) ...[
               const SizedBox(width: 10),
@@ -1257,7 +1932,7 @@ class _ProductScreenState extends State<ProductScreen> {
         ),
         if (standalone) ...[
           const SizedBox(height: 22),
-          const _Promises(column: true),
+          const _Promises(),
         ],
         if (_description.isNotEmpty) ...[
           const SizedBox(height: 28),
@@ -1345,7 +2020,7 @@ class _MoreFromShopState extends State<_MoreFromShop> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _RuledTitle('More from the shop'),
+                const _ShopHeading('More from the shop'),
                 _ProductGrid(others, rows: 1),
               ],
             ),
