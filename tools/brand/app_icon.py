@@ -11,8 +11,9 @@
 # android/app/src/main/res/mipmap-*/ic_launcher.png  the square icon
 # android/app/src/main/res/mipmap-*/ic_launcher_foreground.png  the adaptive
 #   icon's tank (Android 8+), on @color/ic_launcher_background
-# assets/brand/tank.png  the tank alone, 480 px wide, beside Battle Shop's
-#   name in its header (ShopMark in lib/screens/merch.dart)
+# assets/brand/tank.png  the tank alone, 480 px wide and bubblegum pink,
+#   beside Battle Shop's name in its header and footer (ShopMark in
+#   lib/screens/merch.dart)
 import json
 from pathlib import Path
 
@@ -56,7 +57,20 @@ for density, scale in {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi
     save(icon, round(48 * scale), res / f"mipmap-{density}/ic_launcher.png")
     save(fg, round(108 * scale), res / f"mipmap-{density}/ic_launcher_foreground.png", rgb=False)
 
-# In the app: the tank on nothing, small enough to ship.
-tank.resize((480, round(tank.height * 480 / tank.width)), Image.LANCZOS).save(
+# In the app: the tank on nothing, small enough to ship, in Battle Shop's
+# bubblegum pink. Every pixel of tank-coral.png is the coral, black, or a
+# blend of the two, so its red says how much coral it holds.
+PINK = (0xFF, 0xA3, 0xD1)
+
+
+def recolor(px):
+    r, g, b, a = px
+    t = r / 0xFF
+    return (round(PINK[0] * t), round(PINK[1] * t), round(PINK[2] * t), a)
+
+
+pink = Image.new("RGBA", tank.size)
+pink.putdata([recolor(px) for px in tank.getdata()])
+pink.resize((480, round(tank.height * 480 / tank.width)), Image.LANCZOS).save(
     ROOT / "assets/brand/tank.png", optimize=True
 )
