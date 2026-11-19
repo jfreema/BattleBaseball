@@ -84,9 +84,9 @@ if (existsSync(join(web, "index.html"))) {
   // What tells the app which site it is.
   set(/(<meta name="viewport"[^>]*>\n)()/, '  <meta name="bb-site" content="shop">\n');
   // The loading screen: Battle Shop's band as the app draws it (the tank and
-  // BATTLE over SHOP on the darker blue, over a line of stitches), and no
-  // showcase headline. Sizes and positions mirror _BattleShopBar and ShopMark
-  // in lib/screens/merch.dart, so the app's first frame lands on top of this
+  // BATTLE over SHOP on the darker blue, over a gold stripe), and no showcase
+  // headline. Sizes and positions mirror _BattleShopBar and ShopMark in
+  // lib/screens/merch.dart, so the app's first frame lands on top of this
   // without anything moving.
   set(
     /(<div class="shell-bar">)<div class="shell-mark"><b>BATTLE<\/b><i>BASEBALL<\/i><\/div>(<\/div>)/,
@@ -97,22 +97,22 @@ if (existsSync(join(web, "index.html"))) {
   set(
     /(\n)(  <\/style>)/,
     `    /* Battle Shop's band: 76 px on phones and 116 on desktop, on a 3 px ink
-       edge, with the mark set in the room above the stitches. */
+       edge, with the mark set in the room above a gold stripe. */
     .shell-bar {
       position: relative; box-sizing: content-box; max-width: none; margin: 0; padding: 0; height: 76px;
       background: #1a3f9b; background: color-mix(in srgb, var(--ink) 30%, var(--field));
-      border-bottom: 3px solid var(--ink); --s: 1.24675;
+      border-bottom: 3px solid var(--ink); --s: 1.19481;
     }
     .shell-bar::after {
-      content: ""; position: absolute; left: 0; right: 0; bottom: 5px; height: 2px;
-      background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--coral) 65%, transparent) 0 7px, transparent 7px 12px);
+      content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 5px;
+      background: var(--coral); border-top: 3px solid var(--ink);
     }
-    .shell-row { box-sizing: border-box; display: flex; align-items: center; max-width: 1200px; height: 72px; margin: 0 auto; padding: 0 16px; }
+    .shell-row { box-sizing: border-box; display: flex; align-items: center; max-width: 1200px; height: 68px; margin: 0 auto; padding: 0 16px; }
     .shell-tank { height: calc(34.65px * var(--s)); width: auto; margin-right: calc(9.24px * var(--s)); }
     @media (min-width: 960px) {
-      .shell-bar { max-width: none; padding: 0; height: 116px; --s: 1.87013; }
-      .shell-bar::after { bottom: 7px; }
-      .shell-row { height: 110px; padding: 0 40px; }
+      .shell-bar { max-width: none; padding: 0; height: 116px; --s: 1.81818; }
+      .shell-bar::after { height: 6px; }
+      .shell-row { height: 107px; padding: 0 40px; }
     }
 `,
   );

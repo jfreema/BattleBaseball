@@ -77,10 +77,17 @@ Future<void> _open(WidgetTester t, String location, {Size size = _phone, double 
     _openWith(t, _router(location), size: size, text: text);
 
 /// Opens Battle Shop's own site at [location], with the routes it has there.
-Future<void> _openShop(WidgetTester t, String location, {Size size = _phone, double text = 1}) =>
-    _openWith(t, battleShopRouter(initialLocation: location), size: size, text: text);
+/// With [still], for someone who has asked their device for less motion.
+Future<void> _openShop(WidgetTester t, String location, {Size size = _phone, double text = 1, bool still = false}) =>
+    _openWith(t, battleShopRouter(initialLocation: location), size: size, text: text, still: still);
 
-Future<void> _openWith(WidgetTester t, GoRouter router, {required Size size, required double text}) async {
+Future<void> _openWith(
+  WidgetTester t,
+  GoRouter router, {
+  required Size size,
+  required double text,
+  bool still = false,
+}) async {
   t.view
     ..devicePixelRatio = 3
     ..physicalSize = size * 3;
@@ -90,7 +97,7 @@ Future<void> _openWith(WidgetTester t, GoRouter router, {required Size size, req
     theme: BB.theme(),
     routerConfig: router,
     builder: (context, child) => MediaQuery(
-      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(text)),
+      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(text), disableAnimations: still),
       child: child!,
     ),
   ));
@@ -789,21 +796,90 @@ void main() {
     }
   });
 
-  testWidgets("Battle Shop's first page opens with its headline and what a shopper can count on", (t) async {
+  testWidgets("Battle Shop's first page opens with its ticker, its headline and the lowest price on a starburst",
+      (t) async {
     for (final size in [_phone, _narrow, _desktop]) {
       Shop.instance = Shop(_Teams());
       await _openShop(t, '/', size: size);
       final at = '${size.width.round()} wide';
       expect(t.takeException(), isNull, reason: at);
+      // The ticker runs the window's whole width, right under the band.
+      final ticker = t.getRect(find.byType(ShopTicker));
+      expect(ticker.left, 0, reason: at);
+      expect(ticker.right, size.width, reason: at);
+      expect(ticker.top, size.width >= BB.breakpoint ? 119 : 79, reason: 'right under the band, $at');
+      expect(
+        find.bySemanticsLabel('Printed to order. Shipped to you. Secure checkout on Shopify.'),
+        findsOneWidget,
+        reason: 'what the ticker is read out as, $at',
+      );
+      // Then the headline, then the shirts.
       expect(_headline(), findsOneWidget, reason: at);
-      for (final promise in ['Printed to order', 'Shipped to you', 'Secure checkout on Shopify']) {
-        expect(find.text(promise), findsOneWidget, reason: '$promise, $at');
-        expect(t.getRect(find.text(promise)).right, lessThanOrEqualTo(size.width), reason: '$promise, $at');
-      }
-      // The headline comes first, then the shirts.
+      expect(t.getRect(_headline()).top, greaterThanOrEqualTo(ticker.bottom), reason: at);
       expect(t.getRect(_headline()).bottom, lessThan(t.getTopLeft(find.text('Battle Baseball')).dy), reason: at);
+      // The cheapest thing in the shop is a $25 tee.
+      expect(find.text(r'$25'), findsOneWidget, reason: at);
+      final burst = t.getRect(find.text('FROM'));
+      expect(burst.left, greaterThan(0), reason: 'the starburst, $at');
+      expect(burst.right, lessThan(size.width), reason: 'the starburst, $at');
+      // Each shirt carries its price.
+      expect(find.text(r'From $25'), findsNWidgets(2), reason: at);
+      expect(find.text(r'From $26'), findsOneWidget, reason: at);
       await _close(t);
     }
+  });
+
+  testWidgets("Battle Shop's ticker runs right to left, and stands still for someone who asked for less motion",
+      (t) async {
+    final first = find.descendant(of: find.byType(ShopTicker), matching: find.text('PRINTED TO ORDER'));
+    for (final size in [_phone, _desktop]) {
+      final at = '${size.width.round()} wide';
+      await _openShop(t, '/', size: size);
+      final before = t.getTopLeft(first.first).dx;
+      await t.pump(const Duration(seconds: 1));
+      expect(t.getTopLeft(first.first).dx, lessThan(before - 10), reason: at);
+      // One pass of its lines is wide enough that the passes laid side by
+      // side always cover the window.
+      final pass = t.getTopLeft(first.at(1)).dx - t.getTopLeft(first.first).dx;
+      expect(pass, greaterThanOrEqualTo(640), reason: at);
+      expect(first.evaluate().length * pass, greaterThanOrEqualTo(size.width + pass), reason: at);
+      await _close(t);
+
+      await _openShop(t, '/', size: size, still: true);
+      final still = t.getTopLeft(first.first).dx;
+      await t.pump(const Duration(seconds: 1));
+      expect(t.getTopLeft(first.first).dx, still, reason: at);
+      // Nothing waits to arrive, either: the starburst is there at full size.
+      expect(t.getSize(find.text('FROM')).height, greaterThan(8), reason: at);
+      expect(t.takeException(), isNull, reason: at);
+      await _close(t);
+    }
+  });
+
+  testWidgets('Battle Shop has no dashed rules, and nothing but the teams under Participating teams', (t) async {
+    const line = 'Gear for the teams that play in Battle Baseball showcases.';
+    for (final size in [_phone, _desktop]) {
+      for (final location in ['/', '/$_tropic', '/cart']) {
+        Shop.instance = Shop(_Teams());
+        await _fillCart();
+        await _openShop(t, location, size: size);
+        final at = '$location at ${size.width.round()} wide';
+        expect(t.takeException(), isNull, reason: at);
+        expect(find.byType(DashedRule), findsNothing, reason: at);
+        if (location == '/') {
+          expect(find.text('Participating teams'), findsOneWidget, reason: at);
+          expect(find.text('Cyclones'), findsOneWidget, reason: at);
+          expect(find.text(line), findsNothing, reason: at);
+        }
+        await _close(t);
+      }
+    }
+
+    // Merch in the app still introduces them.
+    Shop.instance = Shop(_Teams());
+    await _open(t, '/merch');
+    expect(find.text(line), findsOneWidget);
+    await _close(t);
   });
 
   testWidgets("on desktop the two shirts beside Battle Shop's headline open their pages", (t) async {
@@ -860,7 +936,7 @@ void main() {
     await _close(t);
   });
 
-  testWidgets('Merch in the app keeps its own look: none of Battle Shop\'s band, headline, extras or footer',
+  testWidgets('Merch in the app keeps its own look: none of Battle Shop\'s band, ticker, headline, extras or footer',
       (t) async {
     for (final size in [_phone, _desktop]) {
       for (final location in ['/merch', '/merch/$_tropic']) {
@@ -871,6 +947,8 @@ void main() {
         expect(find.byType(ShopMark), findsNothing, reason: at);
         expect(_headline(), findsNothing, reason: at);
         expect(find.text('Printed to order'), findsNothing, reason: at);
+        expect(find.byType(ShopTicker), findsNothing, reason: at);
+        expect(find.text('FROM'), findsNothing, reason: at);
         expect(find.text('More from the shop'), findsNothing, reason: at);
         expect(find.byType(DashedRule), findsNothing, reason: at);
         expect(find.byType(BackHeader), findsOneWidget, reason: at);
