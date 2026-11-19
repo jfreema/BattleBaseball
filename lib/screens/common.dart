@@ -250,9 +250,13 @@ class BackHeader extends StatelessWidget {
   }
 }
 /// What an address that leads nowhere shows, and what a screen shows for a
-/// player or showcase that isn't there.
+/// player or showcase that isn't there. The way out is Home, unless the
+/// screen belongs somewhere that has its own front door.
 class NotFoundScreen extends StatelessWidget {
-  const NotFoundScreen({super.key});
+  const NotFoundScreen({super.key, this.label = 'Home', this.path = '/'});
+
+  final String label;
+  final String path;
 
   @override
   Widget build(BuildContext context) => PageFrame(
@@ -260,7 +264,7 @@ class NotFoundScreen extends StatelessWidget {
           const SizedBox(height: 56),
           Text('Nothing here.', style: BB.title(BB.isWide(context) ? 44 : 34, drop: 4)),
           const SizedBox(height: 6),
-          TextLink('Home', onTap: () => context.go('/')),
+          TextLink(label, onTap: () => context.go(path)),
         ],
       );
 }

@@ -43,10 +43,10 @@
       { "source": "/app/:path*", "destination": "/:path", "type": 302 },
       { "source": "/register/:id", "destination": "/events/:id/reserve", "type": 302 },
       { "source": "/how-it-works", "destination": "/", "type": 302 },
-      { "source": "/shop", "destination": "/merch", "type": 302 },
       { "source": "/battleplan", "destination": "https://getbattleplan.app", "type": 302 }
     ],
     "rewrites": [
+      { "source": "/shop/**", "destination": "/shop.html" },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [

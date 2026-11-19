@@ -6,6 +6,7 @@
 // tools/brand/icon.svg       -> web/icons/Icon-192.png, Icon-512.png
 // tools/brand/icon-maskable.svg -> web/icons/Icon-maskable-192.png, -512.png
 // tools/brand/og.html        -> web/og.png (1200 x 630)
+// tools/brand/og-shop.html   -> web/og-shop.png (1200 x 630), Battle Shop's
 //
 // The B in the mark is Lilita One's, traced once with glyph.mjs. The SVGs
 // pin their art to the top left (preserveAspectRatio="xMinYMin") because a
@@ -36,6 +37,7 @@ const jobs = [
   ["tools/brand/icon-maskable.svg", "web/icons/Icon-maskable-192.png", 192, 192],
   ["tools/brand/icon-maskable.svg", "web/icons/Icon-maskable-512.png", 512, 512],
   ["tools/brand/og.html", "web/og.png", 1200, 630],
+  ["tools/brand/og-shop.html", "web/og-shop.png", 1200, 630],
 ];
 
 for (const [source, out, width, height, clear] of jobs) {
