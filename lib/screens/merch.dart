@@ -254,7 +254,7 @@ class _ShopFooter extends StatelessWidget {
       runSpacing: 2,
       children: [
         Text('Shirts are printed to order and shipped to you.', style: BB.bodyStyle(14.5)),
-        Text('Checkout runs on Shopify.', style: BB.bodyStyle(14.5)),
+        Text('Checkout is secure.', style: BB.bodyStyle(14.5)),
       ],
     );
     final rights = Text('© ${DateTime.now().year} Battle Baseball', style: BB.bodyStyle(13.5, height: 1.2));
@@ -856,7 +856,7 @@ class ShopTicker extends StatefulWidget {
   const ShopTicker({super.key});
 
   /// The first three are the shop's promises, which a shirt's page lists too.
-  static const lines = ['Printed to order', 'Shipped to you', 'Secure checkout on Shopify', 'Gear up for game day'];
+  static const lines = ['Printed to order', 'Shipped to you', 'Secure checkout', 'Gear up for game day'];
 
   @override
   State<ShopTicker> createState() => _ShopTickerState();
@@ -2373,7 +2373,13 @@ class _CartScreenState extends State<CartScreen> {
                   onPressed: shop.buyable.isEmpty ? null : _checkout,
                 ),
                 const SizedBox(height: 12),
-                Text('You pay on our Shopify checkout page.', style: BB.bodyStyle(14.5)),
+                // Battle Shop doesn't name the checkout's maker to its shoppers.
+                Text(
+                  ShopSite.of(context).standalone
+                      ? 'You pay on a secure checkout page.'
+                      : 'You pay on our Shopify checkout page.',
+                  style: BB.bodyStyle(14.5),
+                ),
               ],
             ],
           );

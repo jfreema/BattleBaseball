@@ -636,7 +636,7 @@ void main() {
         'Cyclones',
         'Cyclones Hoodie',
       ]);
-      expect(find.text('Checkout runs on Shopify.'), findsOneWidget, reason: at);
+      expect(find.text('Checkout is secure.'), findsOneWidget, reason: at);
       await _close(t);
     }
   });
@@ -771,7 +771,7 @@ void main() {
         expect(cart.right, lessThanOrEqualTo(size.width), reason: at);
         // One Cart button, the band's: the page under it has none of its own.
         expect(find.byType(CartButton), findsOneWidget, reason: at);
-        expect(find.text('Checkout runs on Shopify.'), findsOneWidget, reason: 'the footer, $at');
+        expect(find.text('Checkout is secure.'), findsOneWidget, reason: 'the footer, $at');
         expect(_mark('Shop'), findsNWidgets(2), reason: 'the band and the footer, $at');
 
         // The mark leads to the shop's first page.
@@ -788,7 +788,7 @@ void main() {
       await _openShop(t, '/cart', size: size);
       final at = '${size.width.round()} wide';
       expect(find.text('Nothing in your cart yet.'), findsOneWidget, reason: at);
-      final footer = t.getRect(find.text('Checkout runs on Shopify.'));
+      final footer = t.getRect(find.text('Checkout is secure.'));
       expect(footer.bottom, lessThanOrEqualTo(size.height), reason: at);
       expect(footer.bottom, greaterThan(size.height - 90), reason: 'at the bottom, not under the cart, $at');
       expect(t.takeException(), isNull, reason: at);
@@ -809,7 +809,7 @@ void main() {
       expect(ticker.right, size.width, reason: at);
       expect(ticker.top, size.width >= BB.breakpoint ? 119 : 79, reason: 'right under the band, $at');
       expect(
-        find.bySemanticsLabel('Printed to order. Shipped to you. Secure checkout on Shopify.'),
+        find.bySemanticsLabel('Printed to order. Shipped to you. Secure checkout.'),
         findsOneWidget,
         reason: 'what the ticker is read out as, $at',
       );
@@ -854,6 +854,29 @@ void main() {
       expect(t.takeException(), isNull, reason: at);
       await _close(t);
     }
+  });
+
+  testWidgets("Battle Shop never names Shopify to a shopper; Merch in the app still does", (t) async {
+    final shopify = find.byWidgetPredicate((w) => w is Text && (w.data ?? '').contains('Shopify'));
+    for (final size in [_phone, _desktop]) {
+      for (final location in ['/', '/$_tropic', '/cart']) {
+        Shop.instance = Shop(_Teams());
+        await _fillCart();
+        await _openShop(t, location, size: size);
+        final at = '$location at ${size.width.round()} wide';
+        expect(t.takeException(), isNull, reason: at);
+        expect(shopify, findsNothing, reason: at);
+        expect(find.textContaining('Shopify', findRichText: true), findsNothing, reason: at);
+        if (location == '/') expect(find.text('SECURE CHECKOUT'), findsWidgets, reason: 'the ticker, $at');
+        if (location == '/cart') expect(find.text('You pay on a secure checkout page.'), findsOneWidget, reason: at);
+        await _close(t);
+      }
+    }
+    Shop.instance = Shop(SampleShop());
+    await _fillCart();
+    await _open(t, '/merch/cart');
+    expect(find.text('You pay on our Shopify checkout page.'), findsOneWidget);
+    await _close(t);
   });
 
   testWidgets('Battle Shop has no dashed rules, and nothing but the teams under Participating teams', (t) async {
@@ -913,7 +936,7 @@ void main() {
       // Its own section's other shirt comes first; the shirt itself isn't listed.
       expect(find.text('Battle Baseball Tee - True Royal'), findsOneWidget, reason: at);
       expect(find.text('Battle Baseball Tee - Tropic Blue'), findsOneWidget, reason: "only the page's own title, $at");
-      for (final promise in ['Printed to order', 'Shipped to you', 'Secure checkout on Shopify']) {
+      for (final promise in ['Printed to order', 'Shipped to you', 'Secure checkout']) {
         expect(find.text(promise), findsOneWidget, reason: '$promise, $at');
       }
 
