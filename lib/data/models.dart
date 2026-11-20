@@ -24,6 +24,48 @@ const measurementTypes = <String, ({String label, String unit, bool lowerIsBette
   'dash40': (label: '40-yard dash', unit: 'sec', lowerIsBetter: true),
 };
 
+/// The age groups Battle Baseball runs, youngest first. Every leaderboard is
+/// split by these.
+const ageGroups = ['10U', '12U', '14U'];
+
+/// The age group a player of [age] plays in: 10 and under in 10U, 11 and 12
+/// in 12U, 13 and 14 in 14U. Older players have no group yet.
+String? ageGroupForAge(int age) => age <= 10
+    ? '10U'
+    : age <= 12
+        ? '12U'
+        : age <= 14
+            ? '14U'
+            : null;
+
+/// The age group a showcase division counts toward, from the number in its
+/// name: "10U" is 10U, "11U Gold" and "12U" are 12U, "13U" and "14U" are 14U.
+String? ageGroupOf(String divisionName) {
+  final m = RegExp(r'(\d+)\s*U', caseSensitive: false).firstMatch(divisionName);
+  return m == null ? null : ageGroupForAge(int.parse(m[1]!));
+}
+
+/// A birth date as the player form takes it, MM/DD/YYYY, or as YYYY-MM-DD.
+DateTime? parseBirthDate(String? s) {
+  final t = s?.trim() ?? '';
+  final us = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch(t);
+  if (us != null) {
+    return DateTime(int.parse(us[3]!), int.parse(us[1]!), int.parse(us[2]!));
+  }
+  final iso = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$').firstMatch(t);
+  if (iso != null) {
+    return DateTime(int.parse(iso[1]!), int.parse(iso[2]!), int.parse(iso[3]!));
+  }
+  return null;
+}
+
+/// How old someone born on [birth] is on [day].
+int ageOn(DateTime birth, DateTime day) {
+  var age = day.year - birth.year;
+  if (day.month < birth.month || (day.month == birth.month && day.day < birth.day)) age--;
+  return age;
+}
+
 const playingLevels = ['Rec', 'All-Star', 'Travel', 'Elite travel'];
 const positionsList = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'UT'];
 
@@ -356,6 +398,10 @@ class Registration {
   final bool skillsOptIn;
 
   bool get isHeld => status == 'held' || status == 'offered';
+
+  /// Put on the showcase by an event admin rather than reserved by a family,
+  /// so there is no payment behind it.
+  bool get addedByStaff => paidVia == 'staff';
   bool get holdEnded => isHeld && holdEndsAt != null && holdEndsAt!.isBefore(DateTime.now());
   bool get isConfirmed => status == 'paid' || status == 'checkedIn';
 
@@ -417,6 +463,10 @@ class Measurement {
   final bool published;
 
   String get unit => measurementTypes[type]?.unit ?? '';
+
+  /// The age group this reading counts toward: the player's division at the
+  /// showcase, folded into 10U, 12U or 14U.
+  String? get ageGroup => ageGroupOf(divisionName);
 
   static Measurement fromDoc(DocumentSnapshot<Json> d) {
     final m = d.data() ?? const {};
@@ -522,6 +572,25 @@ class StatLine {
 
   bool get hasBatting => ab + h + hr + rbi + r + bb > 0;
   bool get hasPitching => outs + k + pbb > 0;
+
+  /// The age group this line counts toward (see [Measurement.ageGroup]).
+  String? get ageGroup => ageGroupOf(divisionName);
+
+  /// This line's home runs as a stand-in reading of type 'homeRuns', so they
+  /// rank on the same boards as the radar and the stopwatch.
+  Measurement get homeRuns => Measurement(
+        id: id,
+        eventId: eventId,
+        eventName: eventName,
+        playerId: playerId,
+        publicName: publicName,
+        divisionName: divisionName,
+        gradYear: gradYear,
+        type: 'homeRuns',
+        value: hr.toDouble(),
+        recordedAt: recordedAt,
+        published: published,
+      );
 
   /// ".412", or ".000" before the first at-bat.
   String get avg => battingAverage(h, ab);
@@ -667,4 +736,32 @@ class AppUser {
       email: m['email'] as String? ?? '',
     );
   }
+}
+
+/// True when a smaller number wins on [type]'s board: the stopwatch drills.
+bool lowerIsBetter(String type) => measurementTypes[type]?.lowerIsBetter ?? false;
+
+/// Each player's best reading of [type], best first: the fastest fastball,
+/// the quickest 40, the most home runs in one showcase. With [ageGroup],
+/// only readings that count toward that age group. A player shows once per
+/// board; a home run board leaves off players with none.
+List<Measurement> bestReadings(
+  Iterable<Measurement> readings,
+  String type, {
+  String? ageGroup,
+}) {
+  final lower = lowerIsBetter(type);
+  final best = <String, Measurement>{};
+  for (final m in readings) {
+    if (m.type != type) continue;
+    if (ageGroup != null && m.ageGroup != ageGroup) continue;
+    if (type == 'homeRuns' && m.value <= 0) continue;
+    final cur = best[m.playerId];
+    if (cur == null || (lower ? m.value < cur.value : m.value > cur.value)) best[m.playerId] = m;
+  }
+  return best.values.toList()
+    ..sort((a, b) {
+      final by = lower ? a.value.compareTo(b.value) : b.value.compareTo(a.value);
+      return by != 0 ? by : a.publicName.compareTo(b.publicName);
+    });
 }

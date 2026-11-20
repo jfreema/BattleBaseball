@@ -1,5 +1,6 @@
-// Leaders: each player's best reading on a board. The top three are mini
-// cards, the rest sit on one ruled panel.
+// Leaders: one board per stat and age group (10U, 12U, 14U), each player's
+// best from every showcase. The top three are mini cards, the rest sit on one
+// ruled panel.
 import 'dart:async';
 
 import 'package:battle_baseball/data/models.dart';
@@ -14,9 +15,9 @@ import 'package:material_ui/material_ui.dart';
 /// The boards in the order their chips appear, and what each is called.
 const _boards = <String, String>{
   'fastball': 'Fastball',
+  'dash40': '40 yard',
   'homeRuns': 'Home run',
   'popTime': 'Pop time',
-  'dash40': '40 yard',
 };
 
 /// How many places a board lists.
@@ -30,21 +31,21 @@ class LeaderboardsScreen extends StatefulWidget {
 }
 
 class _LeaderboardsScreenState extends State<LeaderboardsScreen> {
-  // All three boards are read up front: the board chips only show when more
-  // than one of them has readings.
+  // Every board is read up front: the board chips only show when more than
+  // one of them has readings.
   final _readings = <String, List<Measurement>>{};
   final _subs = <StreamSubscription<List<Measurement>>>[];
   StreamSubscription<List<Player>>? _familySub;
   String? _uid;
   Set<String> _mine = const {};
   String _type = _boards.keys.first;
-  int? _grad;
+  String? _group;
 
   @override
   void initState() {
     super.initState();
     for (final type in _boards.keys) {
-      final board = type == 'homeRuns' ? Repo.instance.homeRunLeaders() : Repo.instance.leaderboard(type);
+      final board = type == 'homeRuns' ? Repo.instance.homeRunReadings() : Repo.instance.readings(type);
       _subs.add(board.listen(
             (list) => _put(type, list),
             // A board that can't be read is an empty board.
@@ -94,9 +95,9 @@ class _LeaderboardsScreenState extends State<LeaderboardsScreen> {
         readings: _readings,
         mine: _mine,
         type: _type,
-        grad: _grad,
+        group: _group,
         onType: (t) => setState(() => _type = t),
-        onGrad: (g) => setState(() => _grad = g),
+        onGroup: (g) => setState(() => _group = g),
       );
 }
 
@@ -106,40 +107,41 @@ class _LeadersView extends StatelessWidget {
     required this.readings,
     required this.mine,
     required this.type,
-    required this.grad,
+    required this.group,
     required this.onType,
-    required this.onGrad,
+    required this.onGroup,
   });
 
   final bool loading;
 
-  /// Each board's readings, best first, one per player.
+  /// Each board's published readings, every showcase's.
   final Map<String, List<Measurement>> readings;
 
   /// Ids of the signed-in family's own players.
   final Set<String> mine;
   final String type;
-  final int? grad;
+  /// The age group picked, or null for the first one with readings.
+  final String? group;
   final ValueChanged<String> onType;
-  final ValueChanged<int?> onGrad;
+  final ValueChanged<String> onGroup;
 
   @override
   Widget build(BuildContext context) {
     final wide = BB.isWide(context);
     final live = [
       for (final t in _boards.keys)
-        if (readings[t]?.isNotEmpty ?? false) t,
+        if (bestReadings(readings[t] ?? const [], t).isNotEmpty) t,
     ];
     // The chosen board, unless it is empty and another one isn't.
     final board = live.isEmpty || live.contains(type) ? type : live.first;
     final all = readings[board] ?? const <Measurement>[];
-    final years = {for (final m in all) ?m.gradYear}.toList()..sort();
-    // A class year picked on one board may not be on the next.
-    final year = years.contains(grad) ? grad : null;
-    final list = [
-      for (final m in all)
-        if (year == null || m.gradYear == year) m,
-    ].take(_places).toList();
+    // The age group picked, or else the youngest with readings on this board.
+    final filled = [
+      for (final g in ageGroups)
+        if (bestReadings(all, board, ageGroup: g).isNotEmpty) g,
+    ];
+    final age = group ?? filled.firstOrNull ?? ageGroups.first;
+    final list = bestReadings(all, board, ageGroup: age).take(_places).toList();
     final unit = board == 'homeRuns' ? 'HR' : measurementTypes[board]?.unit ?? '';
     void open(Measurement m) => context.go('/players/${m.playerId}');
 
@@ -148,10 +150,10 @@ class _LeadersView extends StatelessWidget {
       column: wide ? 560 : 640,
       children: [
         const TabHeader(),
-        PageTitle('${_boards[board]} leaders', padding: const EdgeInsets.only(top: 6, bottom: 13)),
+        PageTitle('$age ${_boards[board]} leaders', padding: const EdgeInsets.only(top: 6, bottom: 13)),
         if (loading)
           const LoadingField()
-        else if (all.isEmpty)
+        else if (live.isEmpty)
           const Quiet('No readings yet.')
         else ...[
           if (live.length > 1) ...[
@@ -165,23 +167,21 @@ class _LeadersView extends StatelessWidget {
             ),
             const SizedBox(height: 4),
           ],
-          if (years.isNotEmpty)
-            Semantics(
-              container: true,
-              label: 'Class year',
-              child: ChipRow(children: [
-                BBChip('All', selected: year == null, onTap: () => onGrad(null)),
-                for (final y in years)
-                  BBChip('$y', selected: year == y, onTap: () => onGrad(y)),
-              ]),
-            ),
+          Semantics(
+            container: true,
+            label: 'Age group',
+            child: ChipRow(children: [
+              for (final g in ageGroups) BBChip(g, selected: age == g, onTap: () => onGroup(g)),
+            ]),
+          ),
           SizedBox(height: wide ? 17 : 15),
+          if (list.isEmpty) Quiet('No $age readings on this board yet.'),
           for (final (i, m) in list.take(3).indexed) ...[
             if (i > 0) const SizedBox(height: 9),
             MiniCard(
               rank: i + 1,
               name: m.publicName,
-              sub: m.gradYear == null ? null : 'Class of ${m.gradYear}',
+              sub: m.eventName.isEmpty ? null : m.eventName,
               value: fmtValue(m.value, board),
               unit: unit,
               first: i == 0,
@@ -196,7 +196,7 @@ class _LeadersView extends StatelessWidget {
                 RuledRow(
                   rank: i + 4,
                   name: m.publicName,
-                  sub: m.gradYear?.toString(),
+                  sub: m.eventName.isEmpty ? null : m.eventName,
                   value: fmtValue(m.value, board),
                   unit: unit,
                   dot: mine.contains(m.playerId),

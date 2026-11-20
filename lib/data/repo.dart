@@ -202,6 +202,24 @@ class Repo {
       (s) => s.docs.map(PublicProfile.fromDoc).toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())));
 
+  /// Every player on file, by name (Battle Baseball admins), for putting
+  /// players on a showcase.
+  Stream<List<Player>> allPlayers() => players.snapshots().map((s) =>
+      s.docs.map(Player.fromDoc).toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())));
+
+  /// The age group [p] plays in at [e]: from the birth date on file, on the
+  /// showcase's day (today when it has no date). Null when there's no birth
+  /// date or the player is past 14.
+  Future<String?> ageGroupAt(Player p, BBEvent e) async {
+    try {
+      final priv = await playerPrivate(p.id).first;
+      final birth = parseBirthDate(priv?['birthDate'] as String?);
+      return birth == null ? null : ageGroupForAge(ageOn(birth, e.start ?? DateTime.now()));
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ---------- Registrations ----------
 
   static String regId(String eventId, String playerId) => '${eventId}_$playerId';
@@ -294,6 +312,62 @@ class Repo {
     });
     return Registration.fromDoc(await regRef.get());
   }
+
+  /// An event admin puts a player on a showcase in [ageGroup], with no hold
+  /// and no payment: the spot counts as confirmed straight away. The age
+  /// group's division is made if the showcase doesn't have one yet.
+  Future<void> addToEvent(BBEvent e, Player p, String ageGroup, List<Division> divisions) async {
+    final regRef = registrations.doc(regId(e.id, p.id));
+    final existing = await regRef.get();
+    if (existing.exists) {
+      final r = Registration.fromDoc(existing);
+      if (r.status != 'released' && r.status != 'cancelled') {
+        throw StateError('${p.firstName} is already on this showcase.');
+      }
+    }
+    final batch = db.batch();
+    final div = divisions.where((d) => ageGroupOf(d.name) == ageGroup).firstOrNull;
+    final divRef = div == null ? this.divisions.doc() : this.divisions.doc(div.id);
+    if (div == null) {
+      batch.set(divRef, {
+        'eventId': e.id,
+        'name': ageGroup,
+        'capacity': 24,
+        'taken': 1,
+        'order': ageGroups.indexOf(ageGroup),
+      });
+    } else {
+      batch.update(divRef, {'taken': FieldValue.increment(1)});
+    }
+    batch.set(regRef, {
+      'eventId': e.id,
+      'eventName': e.name,
+      'divisionId': divRef.id,
+      'divisionName': div?.name ?? ageGroup,
+      'playerId': p.id,
+      'playerName': p.name,
+      'publicName': p.publicName,
+      'playerPublic': p.publicProfile,
+      'gradYear': p.gradYear,
+      'guardianUid': p.guardianUids.firstOrNull ?? '',
+      'guardianName': '',
+      'status': 'paid',
+      'paidVia': 'staff',
+      'paymentCode': '',
+      'payerName': '',
+      'amount': null,
+      'jersey': p.jersey,
+      'skillsOptIn': e.skillsContest,
+      'alreadyPaid': false,
+      'addedBy': session.user!.uid,
+      'addedByName': session.displayName,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
+  /// Takes a player off a showcase and frees the spot.
+  Future<void> removeFromEvent(Registration r) => release(r);
 
   /// The family says they already paid after a hold ended: back to the front
   /// of the line, flagged for an admin to look for.
@@ -429,53 +503,29 @@ class Repo {
       .snapshots()
       .map((s) => s.docs.map(Award.fromDoc).toList());
 
-  /// The public leaderboard for one measurement type.
-  Stream<List<Measurement>> leaderboard(String type) => measurements
+  /// Every published reading of one type from players with public cards,
+  /// for the leaderboards to rank (see [bestReadings]).
+  Stream<List<Measurement>> readings(String type) => measurements
       .where('published', isEqualTo: true)
       .where('playerPublic', isEqualTo: true)
       .where('type', isEqualTo: type)
       .snapshots()
-      .map((s) {
-        final best = <String, Measurement>{};
-        final lower = measurementTypes[type]?.lowerIsBetter ?? false;
-        for (final m in s.docs.map(Measurement.fromDoc)) {
-          final cur = best[m.playerId];
-          if (cur == null || (lower ? m.value < cur.value : m.value > cur.value)) {
-            best[m.playerId] = m;
-          }
-        }
-        final list = best.values.toList()
-          ..sort((a, b) => lower ? a.value.compareTo(b.value) : b.value.compareTo(a.value));
-        return list;
-      });
+      .map((s) => s.docs.map(Measurement.fromDoc).toList());
 
-  /// Home runs across published showcases, one row per public player, most
-  /// first. Each row is a stand-in Measurement of type 'homeRuns'.
-  Stream<List<Measurement>> homeRunLeaders() => statLines
+  /// The public leaderboard for one measurement type: each player's best.
+  Stream<List<Measurement>> leaderboard(String type) =>
+      readings(type).map((list) => bestReadings(list, type));
+
+  /// Home runs at each published showcase, one stand-in reading of type
+  /// 'homeRuns' per public player per showcase.
+  Stream<List<Measurement>> homeRunReadings() => statLines
       .where('published', isEqualTo: true)
       .where('playerPublic', isEqualTo: true)
       .snapshots()
-      .map((s) => totalHomeRuns(s.docs.map(StatLine.fromDoc)));
-
-  /// Adds up each public player's home runs; players with none are left off.
-  static List<Measurement> totalHomeRuns(Iterable<StatLine> lines) {
-    final rows = <String, Measurement>{};
-    for (final l in lines) {
-      if (l.publicName.isEmpty || l.hr <= 0) continue;
-      final cur = rows[l.playerId];
-      rows[l.playerId] = Measurement(
-        id: l.playerId,
-        eventId: l.eventId,
-        playerId: l.playerId,
-        publicName: l.publicName,
-        gradYear: l.gradYear,
-        type: 'homeRuns',
-        value: (cur?.value ?? 0) + l.hr,
-        published: true,
-      );
-    }
-    return rows.values.toList()..sort((a, b) => b.value.compareTo(a.value));
-  }
+      .map((s) => [
+            for (final l in s.docs.map(StatLine.fromDoc))
+              if (l.publicName.isNotEmpty) l.homeRuns,
+          ]);
 
   /// A player's own results (guardians and staff).
   Stream<List<Measurement>> playerMeasurements(String playerId) => measurements

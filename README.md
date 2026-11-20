@@ -18,7 +18,7 @@ One Flutter app for the web, iPhone, and Android, on Firebase. The design is "Th
 | `lib/design/card.dart` | The player card front and back, award seals, leaderboard rows, the velocity chart |
 | `lib/design/ticket.dart` | The showcase ticket |
 | `lib/data/` | Models, Firestore reads and writes (`repo.dart`), who's signed in with which role (`session.dart`), the sample player (`sample.dart`), sample data for demo mode (`demo.dart`), the merch shop: Shopify products, the cart and checkout (`shop.dart`), product descriptions (`shop_html.dart`), and the sample shirts (`shop_sample.dart`), and which of the two sites the app was opened as (`site.dart`) |
-| `lib/screens/` | Home, Showcases (list, detail, reserve, results), Players (directory, profile, form), Leaders, Merch (the shop, a shirt, the cart, and Battle Shop's frame around the same screens), Host, Account, sign-in, Admin, and event-day tools (check-in, radar, stats, awards, publish) |
+| `lib/screens/` | Home, Showcases (list, detail, reserve, results), Players (directory, profile, form), Leaders, Merch (the shop, a shirt, the cart, and Battle Shop's frame around the same screens), Host, Account, sign-in, Admin, and event-day tools (roster and check-in, radar, stats, awards, publish) |
 | `lib/app.dart` | Routes and the shell: a bottom bar on phones, a top bar from 960 px. On Battle Shop's site the routes are the shop's alone |
 | `web/` | The Flutter web shell: `index.html`, manifest, icons, and the link preview images (`og.png`, and `og-shop.png` for Battle Shop) |
 | `website/` | The five plain pages. `pages/*.html` are wrapped in `_layout.html` by `tools/build_hosting.mjs`; `site.css` and `fonts/` are all they use |
@@ -69,6 +69,26 @@ Battle Shop's site, https://shop.getbattleplan.app, has three addresses and none
 | Event staff | `staffAssignments/{eventId}_{uid}`, `role: "staff"` | One event: check-in, measurements, stats, awards |
 
 To make an account the owner: sign up in the app, then in the Firebase console create `roles/<that user's uid>` with the field `role` = `owner`.
+
+## Age groups, stats and leaderboards
+
+There are three age groups: **10U** (10 and under), **12U** (11 and 12) and **14U** (13 and 14), in `ageGroups` in `lib/data/models.dart`. A showcase's divisions count toward the age group their number falls in, so an "11U" division counts as 12U and "13U" as 14U.
+
+- **Roster.** Families reserve spots, and an event admin can also put any player on file on a showcase: Staff tools > Run > Check-in > **Add player**, pick the player, then the age group (picked for them from the birth date on file, as of the showcase's day). That spot has no hold or payment (`paidVia: "staff"`) and stays out of Payment check; the x on its row takes the player back off. Picking from every player needs a Battle Baseball admin, who can read all players.
+- **Stats.** Every showcase records fastball velocity, the 40-yard dash and home runs; pop time only with the skills contest. Run > Stats lists the roster with each player's best fastball and 40 of the day and their line; tapping one opens a sheet with a fastball and 40-yard field (each adds a reading) and the scorebook steppers, home runs included. Run > Measure still takes readings by jersey number.
+- **Each showcase's results** show a top 5 for fastball, the 40 (quickest first) and home runs, each player's best of the day, with chips to narrow them to one age group.
+- **Leaders** has a board for each stat in each age group: every player's best from all published showcases, with the showcase it came from. Home runs rank by the most in one showcase. Only players with public cards are listed.
+
+## Sample players
+
+`tools/seed/showcase.mjs` loads 15 sample players named after kids from The Simpsons (five each aged 10, 12 and 13), two past showcases (Summer and Fall 2026) with all of them on the roster, published readings, stat lines and awards. Every id starts with `seed-`; each run first deletes every `seed-` document (including the earlier TV-show sample players), so it is safe to run again. It signs in with your gcloud account:
+
+```bash
+gcloud auth application-default login
+npm --prefix tools/seed install
+npm --prefix tools/seed run showcase              # load (or reload) the sample players
+npm --prefix tools/seed run showcase -- --remove  # delete them all
+```
 
 ## Payments
 

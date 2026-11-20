@@ -448,20 +448,35 @@ class DemoRepo extends Repo {
   Stream<List<Award>> publishedAwards(String eventId) => eventAwards(eventId);
 
   @override
-  Stream<List<Measurement>> homeRunLeaders() => Stream.value(Repo.totalHomeRuns(_statLines));
+  Stream<List<Measurement>> readings(String type) => Stream.value(
+      _measurements.where((m) => m.type == type && m.publicName.isNotEmpty).toList());
 
   @override
-  Stream<List<Measurement>> leaderboard(String type) {
-    final lower = measurementTypes[type]?.lowerIsBetter ?? false;
-    final best = <String, Measurement>{};
-    for (final m in _measurements.where((m) => m.type == type && m.publicName.isNotEmpty)) {
-      final cur = best[m.playerId];
-      if (cur == null || (lower ? m.value < cur.value : m.value > cur.value)) {
-        best[m.playerId] = m;
-      }
-    }
-    return Stream.value(best.values.toList()
-      ..sort((a, b) => lower ? a.value.compareTo(b.value) : b.value.compareTo(a.value)));
+  Stream<List<Measurement>> homeRunReadings() => Stream.value([
+        for (final l in _statLines)
+          if (l.publicName.isNotEmpty) l.homeRuns,
+      ]);
+
+  @override
+  Stream<List<Player>> allPlayers() => Stream.value([
+        for (final k in _kids)
+          Player(
+            id: k.id,
+            firstName: k.name.split(' ').first,
+            lastName: k.name.split(' ').last.replaceAll('.', ''),
+            guardianUids: const [parentUid],
+            gradYear: k.year,
+            positions: k.pos,
+            jersey: k.jersey,
+            publicProfile: true,
+          ),
+        _family.first,
+      ]..sort((a, b) => a.name.compareTo(b.name)));
+
+  @override
+  Future<String?> ageGroupAt(Player p, BBEvent e) async {
+    final year = p.gradYear;
+    return year == null ? null : ageGroupOf(_division(year));
   }
 
   @override
@@ -549,6 +564,8 @@ class DemoRepo extends Repo {
   Future<void> addMeasurement(Registration r, BBEvent e, String type, double value) => _no();
   @override
   Future<void> deleteMeasurement(String id) => _no();
+  @override
+  Future<void> addToEvent(BBEvent e, Player p, String ageGroup, List<Division> divisions) => _no();
   @override
   Future<void> addAward(Registration r, BBEvent e, String type) => _no();
   @override
