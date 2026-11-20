@@ -1,12 +1,16 @@
 // Seeds sample showcase results on battlebaseball-prod, so the app has
-// something to show before the first real showcase: 16 players named after
-// kids from TV shows, two past showcases (Summer and Fall 2026) with
-// published radar readings, stat lines and awards, and public player cards.
-// That fills the Showcases, Players and Leaders tabs, with at least five
-// players on each board (fastball, home runs, pop time, 40 yard).
+// something to show before the first real showcase: 15 players named after
+// kids from The Simpsons (five each aged 10, 12 and 13, so 10U, 12U and 14U),
+// two past showcases (Summer and Fall 2026) with every player on the roster,
+// published fastball and 40-yard dash readings, stat lines with home runs,
+// awards, and public player cards. That fills each showcase's top fives and
+// all nine Leaders boards (fastball, 40 yard and home runs in each age group).
 //
-// Every document id starts with "seed-". Uses your gcloud sign-in and
-// refuses every project but battlebaseball-prod:
+// Every document id starts with "seed-". Each run first deletes every
+// "seed-" document already there (including the earlier TV-show sample
+// players), then writes these. Uses your gcloud sign-in and refuses every
+// project but battlebaseball-prod:
+//   npm --prefix tools/seed install                 (once)
 //   npm --prefix tools/seed run showcase            (write, safe to rerun)
 //   npm --prefix tools/seed run showcase -- --remove (delete it all)
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
@@ -18,18 +22,36 @@ initializeApp({ projectId, credential: applicationDefault() });
 const db = getFirestore();
 
 const family = 'seed-family';
-const collections = ['events', 'divisions', 'players', 'publicProfiles', 'registrations', 'measurements', 'statLines', 'awards'];
+const collections = [
+  'events',
+  'divisions',
+  'players',
+  'playerPrivate',
+  'publicProfiles',
+  'registrations',
+  'measurements',
+  'statLines',
+  'awards',
+];
 
-if (process.argv.includes('--remove')) {
+async function removeAll() {
   let n = 0;
   for (const c of collections) {
     const snap = await db.collection(c).get();
-    for (const d of snap.docs.filter((d) => d.id.startsWith('seed-'))) {
-      await d.ref.delete();
-      n++;
+    const docs = snap.docs.filter((d) => d.id.startsWith('seed-'));
+    for (let i = 0; i < docs.length; i += 400) {
+      const batch = db.batch();
+      for (const d of docs.slice(i, i + 400)) batch.delete(d.ref);
+      await batch.commit();
     }
+    n += docs.length;
   }
-  console.log(`Removed ${n} sample documents.`);
+  return n;
+}
+
+const removed = await removeAll();
+if (process.argv.includes('--remove')) {
+  console.log(`Removed ${removed} sample documents.`);
   process.exit(0);
 }
 
@@ -38,38 +60,54 @@ const events = [
   { id: 'seed-fall-2026', name: 'Fall Showcase', start: new Date('2026-10-17T09:00:00-05:00') },
 ];
 
-// fastball [summer, fall] in MPH; pop and dash in seconds (fall); hr [summer, fall].
+// Birthdays fall between January and May, so each player is the same age at
+// both showcases and today. Readings are [summer, fall]: fastball in MPH,
+// 40-yard dash in seconds, home runs per showcase.
 const kids = [
-  { id: 'luke', first: 'Luke', last: 'Dunphy', year: 2029, pos: ['SS', 'P'], bats: 'R', throws: 'R', jersey: 4, fb: [70, 73], dash: 5.21, hr: [1, 1] },
-  { id: 'manny', first: 'Manny', last: 'Delgado', year: 2030, pos: ['P', '1B'], bats: 'R', throws: 'R', jersey: 18, fb: [69, 72], dash: 5.48, hr: [0, 1] },
-  { id: 'bart', first: 'Bart', last: 'Simpson', year: 2031, pos: ['CF', 'P'], bats: 'L', throws: 'L', jersey: 10, fb: [64, 67], dash: 5.3, hr: [0, 0] },
-  { id: 'dustin', first: 'Dustin', last: 'Henderson', year: 2030, pos: ['C', '3B'], bats: 'R', throws: 'R', jersey: 22, fb: [65, 68], pop: 2.08, dash: 5.66, hr: [1, 0] },
-  { id: 'lucas', first: 'Lucas', last: 'Sinclair', year: 2030, pos: ['2B', 'SS'], bats: 'R', throws: 'R', jersey: 3, fb: [66, 69], dash: 5.05, hr: [0, 1] },
-  { id: 'mike', first: 'Mike', last: 'Wheeler', year: 2030, pos: ['P', 'LF'], bats: 'R', throws: 'R', jersey: 11, fb: [68, 71], dash: 5.39, hr: [1, 1] },
-  { id: 'will', first: 'Will', last: 'Byers', year: 2031, pos: ['RF', 'P'], bats: 'L', throws: 'L', jersey: 5, fb: [60, 63], dash: 5.58, hr: [0, 0] },
-  { id: 'kevin', first: 'Kevin', last: 'Arnold', year: 2029, pos: ['CF', 'P'], bats: 'R', throws: 'R', jersey: 8, fb: [71, 74], dash: 4.98, hr: [1, 2] },
-  { id: 'cory', first: 'Cory', last: 'Matthews', year: 2029, pos: ['C', '2B'], bats: 'R', throws: 'R', jersey: 7, fb: [66, 68], pop: 2.2, dash: 5.31, hr: [0, 0] },
-  { id: 'shawn', first: 'Shawn', last: 'Hunter', year: 2029, pos: ['P', '3B'], bats: 'R', throws: 'R', jersey: 21, fb: [72, 76], dash: 5.12, hr: [2, 1] },
-  { id: 'malcolm', first: 'Malcolm', last: 'Wilkerson', year: 2029, pos: ['C', '1B'], bats: 'R', throws: 'R', jersey: 13, fb: [67, 70], pop: 2.01, dash: 5.44, hr: [0, 2] },
-  { id: 'reese', first: 'Reese', last: 'Wilkerson', year: 2029, pos: ['1B', 'P'], bats: 'L', throws: 'R', jersey: 33, fb: [73, 75], dash: 5.25, hr: [2, 2] },
-  { id: 'dewey', first: 'Dewey', last: 'Wilkerson', year: 2032, pos: ['UT'], bats: 'R', throws: 'R', jersey: 1, fb: [57, 60], dash: 6.02, hr: [0, 0] },
-  { id: 'jake', first: 'Jake', last: 'Harper', year: 2030, pos: ['C', 'P'], bats: 'R', throws: 'R', jersey: 26, fb: [64, 66], pop: 2.14, dash: 5.71, hr: [1, 0] },
-  { id: 'ben', first: 'Ben', last: 'Seaver', year: 2031, pos: ['SS'], bats: 'R', throws: 'R', jersey: 2, fb: [61, 64], dash: 5.4, hr: [0, 0] },
-  { id: 'theo', first: 'Theo', last: 'Huxtable', year: 2029, pos: ['C', 'RF'], bats: 'R', throws: 'R', jersey: 15, fb: [68, 70], pop: 1.98, dash: 5.35, hr: [1, 0] },
+  // Age 10: 10U
+  { id: 'bart', first: 'Bart', last: 'Simpson', born: '2016-04-01', pos: ['SS', 'P'], bats: 'R', throws: 'R', jersey: 10, fb: [52, 55], dash: [6.42, 6.31], hr: [1, 2] },
+  { id: 'milhouse', first: 'Milhouse', last: 'Van Houten', born: '2016-03-14', pos: ['1B', 'RF'], bats: 'L', throws: 'L', jersey: 3, fb: [46, 47], dash: [7.08, 6.95], hr: [0, 0] },
+  { id: 'martin', first: 'Martin', last: 'Prince', born: '2016-01-20', pos: ['2B', 'C'], bats: 'R', throws: 'R', jersey: 1, fb: [48, 50], dash: [6.88, 6.81], hr: [0, 1] },
+  { id: 'ralph', first: 'Ralph', last: 'Wiggum', born: '2016-05-02', pos: ['LF', 'UT'], bats: 'S', throws: 'R', jersey: 14, fb: [44, 49], dash: [7.21, 6.99], hr: [1, 0] },
+  { id: 'wendell', first: 'Wendell', last: 'Borton', born: '2016-02-11', pos: ['CF', 'P'], bats: 'R', throws: 'R', jersey: 22, fb: [51, 50], dash: [6.55, 6.6], hr: [0, 1] },
+  // Age 12: 12U
+  { id: 'nelson', first: 'Nelson', last: 'Muntz', born: '2014-02-08', pos: ['P', '3B'], bats: 'R', throws: 'R', jersey: 44, fb: [63, 66], dash: [6.05, 5.98], hr: [2, 1] },
+  { id: 'rod', first: 'Rod', last: 'Flanders', born: '2014-04-22', pos: ['2B', 'SS'], bats: 'R', throws: 'R', jersey: 7, fb: [55, 57], dash: [6.21, 6.12], hr: [0, 0] },
+  { id: 'lisa', first: 'Lisa', last: 'Simpson', born: '2014-05-09', pos: ['P', 'CF'], bats: 'L', throws: 'L', jersey: 8, fb: [59, 61], dash: [5.94, 5.89], hr: [1, 1] },
+  { id: 'janey', first: 'Janey', last: 'Powell', born: '2014-01-30', pos: ['C', '1B'], bats: 'R', throws: 'R', jersey: 12, fb: [57, 56], dash: [6.33, 6.27], hr: [1, 0] },
+  { id: 'uter', first: 'Uter', last: 'Zorker', born: '2014-03-17', pos: ['1B', 'LF'], bats: 'L', throws: 'R', jersey: 33, fb: [54, 58], dash: [6.71, 6.64], hr: [0, 2] },
+  // Age 13: 14U
+  { id: 'jimbo', first: 'Jimbo', last: 'Jones', born: '2013-03-03', pos: ['P', '1B'], bats: 'R', throws: 'R', jersey: 13, fb: [68, 71], dash: [5.62, 5.58], hr: [2, 3] },
+  { id: 'dolph', first: 'Dolph', last: 'Starbeam', born: '2013-01-12', pos: ['SS', 'P'], bats: 'R', throws: 'R', jersey: 2, fb: [66, 67], dash: [5.41, 5.36], hr: [1, 1] },
+  { id: 'kearney', first: 'Kearney', last: 'Zzyzwicz', born: '2013-04-28', pos: ['C', '3B'], bats: 'R', throws: 'R', jersey: 50, fb: [64, 69], dash: [5.88, 5.79], hr: [3, 1] },
+  { id: 'sherri', first: 'Sherri', last: 'Mackleberry', born: '2013-05-19', pos: ['CF', 'P'], bats: 'L', throws: 'R', jersey: 5, fb: [62, 63], dash: [5.49, 5.52], hr: [0, 1] },
+  { id: 'terri', first: 'Terri', last: 'Mackleberry', born: '2013-05-19', pos: ['RF', '2B'], bats: 'L', throws: 'R', jersey: 6, fb: [61, 64], dash: [5.55, 5.47], hr: [1, 0] },
 ];
 
-const division = (year) => ({ 2029: '14U', 2030: '13U', 2031: '12U', 2032: '11U' })[year];
-const divisionOrder = ['11U', '12U', '13U', '14U'];
+const ageOn = (born, day) => {
+  const b = new Date(`${born}T12:00:00`);
+  let age = day.getFullYear() - b.getFullYear();
+  if (day.getMonth() < b.getMonth() || (day.getMonth() === b.getMonth() && day.getDate() < b.getDate())) age--;
+  return age;
+};
+const ageGroup = (age) => (age <= 10 ? '10U' : age <= 12 ? '12U' : '14U');
+const ageGroupOrder = ['10U', '12U', '14U'];
+// Out of high school the spring they turn 18.
+const gradYear = (born) => Number(born.slice(0, 4)) + 18;
+// The player form keeps birth dates as MM/DD/YYYY.
+const formDate = (born) => `${born.slice(5, 7)}/${born.slice(8, 10)}/${born.slice(0, 4)}`;
+
 const awards = [
-  ['seed-summer-2026', 'kevin', 'mvp'],
-  ['seed-summer-2026', 'shawn', 'topPitcher'],
-  ['seed-summer-2026', 'reese', 'topHitter'],
-  ['seed-summer-2026', 'malcolm', 'eliteDefender'],
-  ['seed-fall-2026', 'shawn', 'mvp'],
-  ['seed-fall-2026', 'reese', 'topPitcher'],
-  ['seed-fall-2026', 'kevin', 'topHitter'],
-  ['seed-fall-2026', 'dustin', 'eliteDefender'],
-  ['seed-fall-2026', 'bart', 'hustle'],
+  ['seed-summer-2026', 'jimbo', 'mvp'],
+  ['seed-summer-2026', 'nelson', 'topPitcher'],
+  ['seed-summer-2026', 'kearney', 'topHitter'],
+  ['seed-summer-2026', 'martin', 'eliteDefender'],
+  ['seed-summer-2026', 'ralph', 'hustle'],
+  ['seed-fall-2026', 'bart', 'mvp'],
+  ['seed-fall-2026', 'jimbo', 'topPitcher'],
+  ['seed-fall-2026', 'uter', 'topHitter'],
+  ['seed-fall-2026', 'dolph', 'eliteDefender'],
+  ['seed-fall-2026', 'lisa', 'hustle'],
 ];
 
 const writes = [];
@@ -83,21 +121,21 @@ for (const e of events) {
     venue: 'BREC Central Sports Park',
     address: 'Baton Rouge, LA',
     start: Timestamp.fromDate(e.start),
-    ageGroups: '11U to 14U',
+    ageGroups: '10U, 12U and 14U',
     price: 85,
-    skillsContest: true,
+    skillsContest: false,
     hostTeam: '',
     raisingFor: '',
     description: '',
     resultsPublished: true,
     createdAt: Timestamp.fromDate(e.start),
   });
-  divisionOrder.forEach((name, order) =>
+  ageGroupOrder.forEach((name, order) =>
     set(`divisions/${e.id}-${name}`, {
       eventId: e.id,
       name,
       capacity: 24,
-      taken: kids.filter((k) => division(k.year) === name).length,
+      taken: kids.filter((k) => ageGroup(ageOn(k.born, e.start)) === name).length,
       order,
     }),
   );
@@ -105,13 +143,13 @@ for (const e of events) {
 
 for (const k of kids) {
   const id = `seed-${k.id}`;
-  const publicName = `${k.first} ${k.last[0]}.`;
-  const div = division(k.year);
+  const name = `${k.first} ${k.last}`;
+  const year = gradYear(k.born);
   set(`players/${id}`, {
     firstName: k.first,
     lastName: k.last,
     guardianUids: [family],
-    gradYear: k.year,
+    gradYear: year,
     bats: k.bats,
     throws: k.throws,
     positions: k.pos,
@@ -119,13 +157,20 @@ for (const k of kids) {
     level: 'Travel',
     reportedVelo: null,
     publicProfile: true,
-    fullName: false,
+    fullName: true,
     jersey: k.jersey,
-    publicName,
+    publicName: name,
+  });
+  set(`playerPrivate/${id}`, {
+    birthDate: formDate(k.born),
+    school: 'Springfield Elementary',
+    emergencyName: 'Sample family',
+    emergencyPhone: '225-555-0100',
+    guardianUids: [family],
   });
   set(`publicProfiles/${id}`, {
-    name: publicName,
-    gradYear: k.year,
+    name,
+    gradYear: year,
     positions: k.pos,
     bats: k.bats,
     throws: k.throws,
@@ -134,55 +179,57 @@ for (const k of kids) {
     updatedAt: Timestamp.now(),
   });
   events.forEach((e, i) => {
+    const div = ageGroup(ageOn(k.born, e.start));
+    const at = Timestamp.fromDate(e.start);
     const shared = {
       eventId: e.id,
       eventName: e.name,
       playerId: id,
-      publicName,
+      publicName: name,
       playerPublic: true,
       divisionName: div,
+      gradYear: year,
       published: true,
     };
-    const at = Timestamp.fromDate(e.start);
     set(`registrations/${e.id}_${id}`, {
       eventId: e.id,
       eventName: e.name,
       divisionId: `${e.id}-${div}`,
       divisionName: div,
       playerId: id,
-      playerName: `${k.first} ${k.last}`,
-      publicName,
+      playerName: name,
+      publicName: name,
       playerPublic: true,
-      gradYear: k.year,
+      gradYear: year,
       guardianUid: family,
       guardianName: 'Sample family',
       status: 'checkedIn',
-      paymentCode: 'BB-SEED',
-      amount: 85,
+      paidVia: 'staff',
+      paymentCode: '',
+      payerName: '',
+      amount: null,
       jersey: k.jersey,
-      skillsOptIn: true,
+      skillsOptIn: false,
+      alreadyPaid: false,
+      addedBy: 'seed',
       createdAt: at,
     });
     const reading = (type, value) =>
       set(`measurements/seed-${e.id}-${k.id}-${type}`, {
         ...shared,
-        gradYear: k.year,
         type,
         value,
         recordedBy: 'seed',
         recordedAt: at,
       });
     reading('fastball', k.fb[i]);
-    if (i === 1 && k.pop) reading('popTime', k.pop);
-    if (i === 1 && k.dash) reading('dash40', k.dash);
-    if (i === 0 && k.dash) reading('dash40', Math.round((k.dash + 0.12) * 100) / 100);
+    reading('dash40', k.dash[i]);
     const hr = k.hr[i];
     const ab = 4 + ((k.jersey + i) % 2);
     const h = Math.min(ab, hr + 1 + ((k.jersey + i) % 2));
     const pitches = k.pos.includes('P');
     set(`statLines/${e.id}_${id}`, {
       ...shared,
-      gradYear: k.year,
       ab,
       h,
       hr,
@@ -205,9 +252,9 @@ for (const [eventId, kid, type] of awards) {
     eventId,
     eventName: e.name,
     playerId: `seed-${kid}`,
-    publicName: `${k.first} ${k.last[0]}.`,
+    publicName: `${k.first} ${k.last}`,
     playerPublic: true,
-    divisionName: division(k.year),
+    divisionName: ageGroup(ageOn(k.born, e.start)),
     type,
     recordedBy: 'seed',
     published: true,
@@ -219,4 +266,6 @@ for (let i = 0; i < writes.length; i += 400) {
   for (const [ref, data] of writes.slice(i, i + 400)) batch.set(ref, data);
   await batch.commit();
 }
-console.log(`Wrote ${writes.length} sample documents (${kids.length} players, ${events.length} showcases).`);
+console.log(
+  `Removed ${removed} old sample documents, wrote ${writes.length} (${kids.length} players, ${events.length} showcases).`,
+);

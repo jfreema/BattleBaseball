@@ -1,5 +1,6 @@
-// Event day on a phone: check-in, radar, the scorebook, awards and
-// publishing. It runs on jersey numbers: a volunteer types 23, then 68.
+// Event day on a phone: the roster and check-in, radar and stopwatch, the
+// scorebook, awards and publishing. It runs on jersey numbers: a volunteer
+// types 23, then 68.
 import 'package:battle_baseball/data/models.dart';
 import 'package:battle_baseball/data/repo.dart';
 import 'package:battle_baseball/data/session.dart';
@@ -110,7 +111,7 @@ class _RunEventView extends StatelessWidget {
           // Every tab stays alive, so a half-typed reading survives a look at
           // the check-in list.
           for (final (i, body) in [
-            _CheckIn(regs: r),
+            _CheckIn(e: event, regs: r, canAdd: canPublish),
             _Measure(e: event, regs: r),
             _Stats(e: event, regs: r),
             _Awards(e: event, regs: r),
@@ -257,8 +258,12 @@ class _Number extends StatelessWidget {
 }
 
 class _CheckIn extends StatefulWidget {
-  const _CheckIn({required this.regs});
+  const _CheckIn({required this.e, required this.regs, required this.canAdd});
+  final BBEvent e;
   final List<Registration> regs;
+
+  /// An event admin can put players on the showcase and take them off.
+  final bool canAdd;
   @override
   State<_CheckIn> createState() => _CheckInState();
 }
@@ -296,6 +301,34 @@ class _CheckInState extends State<_CheckIn> {
     );
   }
 
+  /// Picks a player on file, then their age group, and puts them on.
+  Future<void> _add() async {
+    final e = widget.e;
+    final on = {for (final r in widget.regs) r.playerId};
+    final p = await _showSheet<Player>(context, (_) => _AddPlayerSheet(onShowcase: on));
+    if (p == null || !mounted) return;
+    final guess = await Repo.instance.ageGroupAt(p, e);
+    if (!mounted) return;
+    final group = await _showSheet<String>(context, (_) => _AgeGroupSheet(player: p, guess: guess));
+    if (group == null || !mounted) return;
+    await attempt(
+      context,
+      () async => Repo.instance.addToEvent(e, p, group, await Repo.instance.divisionsFor(e.id).first),
+      done: '${p.name} is on the showcase ($group)',
+    );
+  }
+
+  Future<void> _remove(Registration r) async {
+    final answer = await showPrompt(
+      context,
+      title: 'Take ${r.playerName} off?',
+      note: 'Their spot opens back up. Readings and stats already saved stay.',
+      action: 'Take off',
+    );
+    if (answer == null || !mounted) return;
+    await attempt(context, () => Repo.instance.removeFromEvent(r), done: '${r.playerName} is off the showcase');
+  }
+
   @override
   Widget build(BuildContext context) {
     final regs = widget.regs;
@@ -312,6 +345,15 @@ class _CheckInState extends State<_CheckIn> {
           Text('$checked of ${regs.length}', style: BB.title(28, drop: 3)),
           const SizedBox(width: 10),
           Text('CHECKED IN', style: BB.caps(12.5)),
+          if (widget.canAdd) ...[
+            const Spacer(),
+            BBButton.paper(
+              'Add player',
+              small: true,
+              icon: const BBIcon(BBGlyph.plus),
+              onPressed: _add,
+            ),
+          ],
         ],
       ),
       const SizedBox(height: 14),
@@ -337,14 +379,189 @@ class _CheckInState extends State<_CheckIn> {
           // Checked in is filed away on kraft; cream is still to do.
           color: r.status == 'checkedIn' ? BB.kraft : BB.cream,
           onTap: () => _checkIn(r),
-          trailing: r.status == 'checkedIn'
-              ? const _Check()
-              : r.isHeld
-                  ? const Pill('Not paid')
-                  : null,
+          sink: !(widget.canAdd && r.addedByStaff),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (r.status == 'checkedIn')
+                const _Check()
+              else if (r.isHeld)
+                const Pill('Not paid'),
+              if (widget.canAdd && r.addedByStaff)
+                IconTap(BBGlyph.close, label: 'Take ${r.playerName} off', onTap: () => _remove(r)),
+            ],
+          ),
         ),
     ]);
   }
+}
+
+/// Every player on file, to pick one for the showcase. Answers with a Player.
+class _AddPlayerSheet extends StatefulWidget {
+  const _AddPlayerSheet({required this.onShowcase});
+
+  /// Ids of players already on the showcase, left off the list.
+  final Set<String> onShowcase;
+
+  @override
+  State<_AddPlayerSheet> createState() => _AddPlayerSheetState();
+}
+
+class _AddPlayerSheetState extends State<_AddPlayerSheet> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Semantics(header: true, child: Text('Add a player', style: BB.title(26))),
+                ),
+                IconTap(
+                  BBGlyph.close,
+                  label: 'Close',
+                  color: BB.cream,
+                  onTap: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              autofocus: true,
+              textInputAction: TextInputAction.search,
+              decoration: const InputDecoration(hintText: 'Name'),
+              onChanged: (v) => setState(() => _q = v.trim().toLowerCase()),
+            ),
+            const SizedBox(height: 8),
+            LiveData<List<Player>>(
+              stream: Repo.instance.allPlayers,
+              builder: (context, all) {
+                final list = [
+                  for (final p in all)
+                    if (!widget.onShowcase.contains(p.id) && (_q.isEmpty || p.name.toLowerCase().contains(_q))) p,
+                ];
+                if (list.isEmpty) {
+                  return Quiet(all.isEmpty ? 'No players on file yet.' : 'No one else by that name.');
+                }
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final p in list.take(60))
+                      Pressable(
+                        onTap: () => Navigator.of(context).pop(p),
+                        label: p.name,
+                        builder: (context, down, focused) => Opacity(
+                          opacity: down ? 0.6 : 1,
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 56),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                top: BorderSide(color: focused ? BB.cream : BB.hairline, width: 1.5),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                _Number(p.jersey, onPaper: false),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    p.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: BB.labelStyle(18, height: 1.1),
+                                  ),
+                                ),
+                                if (p.gradYear != null) ...[
+                                  const SizedBox(width: 10),
+                                  Text('${p.gradYear}', style: BB.caps(12)),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      );
+}
+
+/// Which age group a player goes in, guessed from their birth date.
+class _AgeGroupSheet extends StatefulWidget {
+  const _AgeGroupSheet({required this.player, required this.guess});
+
+  final Player player;
+  final String? guess;
+
+  @override
+  State<_AgeGroupSheet> createState() => _AgeGroupSheetState();
+}
+
+class _AgeGroupSheetState extends State<_AgeGroupSheet> {
+  late String? _group = widget.guess;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Semantics(
+                    header: true,
+                    child: Text(
+                      widget.player.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: BB.title(24),
+                    ),
+                  ),
+                ),
+                IconTap(
+                  BBGlyph.close,
+                  label: 'Close',
+                  color: BB.cream,
+                  onTap: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.guess == null
+                  ? 'Pick an age group. There is no birth date on file to go by.'
+                  : 'Plays in ${widget.guess} by their birth date.',
+              style: BB.bodyStyle(15.5, color: BB.creamSoft),
+            ),
+            const SizedBox(height: 14),
+            Semantics(
+              container: true,
+              label: 'Age group',
+              child: ChipRow(children: [
+                for (final g in ageGroups)
+                  BBChip(g, selected: _group == g, onTap: () => setState(() => _group = g)),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            BBButton.primary(
+              'Add to showcase',
+              expand: true,
+              onPressed: _group == null ? null : () => Navigator.of(context).pop(_group),
+            ),
+          ],
+        ),
+      );
 }
 
 class _Check extends StatelessWidget {
@@ -386,7 +603,12 @@ class _MeasureState extends State<_Measure> {
     super.dispose();
   }
 
-  List<String> get _types => widget.e.skillsContest ? measurementTypes.keys.toList() : const ['fastball'];
+  /// Velocity and the 40 at every showcase; pop time with the skills contest.
+  List<String> get _types => [
+        'fastball',
+        if (widget.e.skillsContest) 'popTime',
+        'dash40',
+      ];
 
   Registration? get _player {
     final n = int.tryParse(_jersey.text.trim());
@@ -590,47 +812,81 @@ Future<T?> _showSheet<T>(BuildContext context, WidgetBuilder builder) {
   );
 }
 
-/// The scorebook: everyone confirmed for the showcase and their line so far.
+/// The scorebook: everyone confirmed for the showcase, their best fastball
+/// and 40 of the day, and their line so far.
 class _Stats extends StatelessWidget {
   const _Stats({required this.e, required this.regs});
   final BBEvent e;
   final List<Registration> regs;
 
-  Future<void> _open(BuildContext context, Registration r, StatLine? line) async {
-    final saved = await _showSheet<bool>(context, (_) => _StatSheet(reg: r, event: e, line: line));
+  Future<void> _open(BuildContext context, Registration r, StatLine? line, _Best best) async {
+    final saved = await _showSheet<bool>(context, (_) => _StatSheet(reg: r, event: e, line: line, best: best));
     // Said from the page: a toast would sit behind the sheet.
     if (saved == true && context.mounted) toast(context, 'Saved');
   }
 
   @override
-  Widget build(BuildContext context) => LiveData<List<StatLine>>(
-        stream: () => Repo.instance.eventStatLines(e.id),
-        builder: (context, lines) {
-          final byPlayer = {for (final l in lines) l.playerId: l};
-          final players = regs.where((r) => r.isConfirmed).toList()..sort(_byNumber);
-          if (players.isEmpty) return const Quiet('No players yet.');
-          return _stack([
-            for (final r in players)
-              _StatRow(
-                reg: r,
-                line: byPlayer[r.playerId],
-                onTap: () => _open(context, r, byPlayer[r.playerId]),
-              ),
-          ]);
-        },
+  Widget build(BuildContext context) => LiveData<List<Measurement>>(
+        stream: () => Repo.instance.eventMeasurements(e.id),
+        builder: (context, readings) => LiveData<List<StatLine>>(
+          stream: () => Repo.instance.eventStatLines(e.id),
+          builder: (context, lines) {
+            final byPlayer = {for (final l in lines) l.playerId: l};
+            final best = _Best.of(readings);
+            final players = regs.where((r) => r.isConfirmed).toList()..sort(_byNumber);
+            if (players.isEmpty) return const Quiet('No players yet.');
+            return _stack([
+              for (final r in players)
+                _StatRow(
+                  reg: r,
+                  line: byPlayer[r.playerId],
+                  best: best.forPlayer(r.playerId),
+                  onTap: () => _open(context, r, byPlayer[r.playerId], best.forPlayer(r.playerId)),
+                ),
+            ]);
+          },
+        ),
       );
 }
 
+/// A player's best fastball and 40 of the day, or every player's.
+class _Best {
+  const _Best(this.fastball, this.dash);
+
+  final Map<String, double> fastball;
+  final Map<String, double> dash;
+
+  static _Best of(List<Measurement> readings) => _Best(
+        {for (final m in bestReadings(readings, 'fastball')) m.playerId: m.value},
+        {for (final m in bestReadings(readings, 'dash40')) m.playerId: m.value},
+      );
+
+  _Best forPlayer(String id) => _Best(
+        {id: ?fastball[id]},
+        {id: ?dash[id]},
+      );
+
+  double? get oneFastball => fastball.values.firstOrNull;
+  double? get oneDash => dash.values.firstOrNull;
+
+  /// "68 MPH · 5.21 SEC", or empty before either.
+  String get text => [
+        if (oneFastball case final v?) '${fmtValue(v, 'fastball')} MPH',
+        if (oneDash case final v?) '${fmtValue(v, 'dash40')} SEC',
+      ].join(' · ');
+}
+
 class _StatRow extends StatelessWidget {
-  const _StatRow({required this.reg, required this.line, required this.onTap});
+  const _StatRow({required this.reg, required this.line, required this.best, required this.onTap});
 
   final Registration reg;
   final StatLine? line;
+  final _Best best;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final text = line == null ? '' : _lineText(line!);
+    final text = [best.text, if (line != null) _lineText(line!)].where((t) => t.isNotEmpty).join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Paper(
@@ -654,8 +910,8 @@ class _StatRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    text.isEmpty ? 'No line yet' : text,
-                    maxLines: 1,
+                    text.isEmpty ? 'Nothing yet' : text,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: text.isEmpty
                         ? BB.bodyStyle(14, color: BB.ink2, height: 1.2)
@@ -673,10 +929,13 @@ class _StatRow extends StatelessWidget {
 
 /// One player's line, counted up with steppers.
 class _StatSheet extends StatefulWidget {
-  const _StatSheet({required this.reg, required this.event, required this.line});
+  const _StatSheet({required this.reg, required this.event, required this.line, required this.best});
 
   final Registration reg;
   final BBEvent event;
+
+  /// The player's best fastball and 40 so far today.
+  final _Best best;
 
   /// What's on file, if anything.
   final StatLine? line;
@@ -690,6 +949,15 @@ class _StatSheetState extends State<_StatSheet> {
       {'ab': 0, 'h': 0, 'hr': 0, 'rbi': 0, 'r': 0, 'bb': 0, 'outs': 0, 'k': 0, 'pbb': 0};
   bool _busy = false;
   bool _failed = false;
+  final _fastball = TextEditingController();
+  final _dash = TextEditingController();
+
+  @override
+  void dispose() {
+    _fastball.dispose();
+    _dash.dispose();
+    super.dispose();
+  }
 
   StatLine get _line => StatLine(
         id: Repo.regId(widget.event.id, widget.reg.playerId),
@@ -712,7 +980,17 @@ class _StatSheetState extends State<_StatSheet> {
       _failed = false;
     });
     final line = _line;
+    final fastball = double.tryParse(_fastball.text.trim());
+    final dash = double.tryParse(_dash.text.trim());
     try {
+      // A typed reading is added to the player's readings, like one from
+      // the Measure tab; the best of them is what ranks.
+      if (fastball != null) {
+        await Repo.instance.addMeasurement(widget.reg, widget.event, 'fastball', fastball);
+      }
+      if (dash != null) {
+        await Repo.instance.addMeasurement(widget.reg, widget.event, 'dash40', dash);
+      }
       if (line.hasBatting || line.hasPitching) {
         await Repo.instance.saveStatLine(widget.reg, widget.event, line);
       } else if (widget.line != null) {
@@ -734,6 +1012,18 @@ class _StatSheetState extends State<_StatSheet> {
         label: label,
         value: _n[key]!,
         onChanged: _busy ? null : (v) => setState(() => _n[key] = v),
+      );
+
+  /// A field for a new reading, with the best so far under it.
+  Widget _reading(TextEditingController c, String label, double? best, String type) => TextField(
+        controller: c,
+        enabled: !_busy,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        style: BB.lilita(26, color: BB.cream, height: 1.15),
+        decoration: InputDecoration(
+          labelText: label,
+          helperText: best == null ? 'None yet' : 'Best ${fmtValue(best, type)}',
+        ),
       );
 
   static Widget _pair(Widget a, Widget b) => Padding(
@@ -790,6 +1080,15 @@ class _StatSheetState extends State<_StatSheet> {
             ],
           ),
           const SizedBox(height: 18),
+          _pair(
+            _reading(_fastball, 'Fastball MPH', widget.best.oneFastball, 'fastball'),
+            _reading(_dash, '40-yard SEC', widget.best.oneDash, 'dash40'),
+          ),
+          Container(
+            padding: const EdgeInsets.only(top: 14, bottom: 12),
+            decoration: BoxDecoration(border: Border(top: BorderSide(color: BB.hairline, width: 1.5))),
+            child: Text('BATTING', style: BB.caps(13, color: BB.cream, tracking: 0.16)),
+          ),
           _pair(_step('AB', 'ab'), _step('H', 'h')),
           _pair(_step('HR', 'hr'), _step('RBI', 'rbi')),
           _pair(_step('R', 'r'), _step('BB', 'bb')),

@@ -1068,6 +1068,9 @@ class _EventResultsScreenState extends State<EventResultsScreen> {
   final _readings = _Feed<List<Measurement>>();
   final _lines = _Feed<List<StatLine>>();
 
+  /// The age group the top fives are showing; null for everyone.
+  String? _group;
+
   @override
   void initState() {
     super.initState();
@@ -1077,7 +1080,10 @@ class _EventResultsScreenState extends State<EventResultsScreen> {
   @override
   void didUpdateWidget(EventResultsScreen old) {
     super.didUpdateWidget(old);
-    if (old.eventId != widget.eventId) _watch();
+    if (old.eventId != widget.eventId) {
+      _group = null;
+      _watch();
+    }
   }
 
   void _changed() {
@@ -1112,6 +1118,8 @@ class _EventResultsScreenState extends State<EventResultsScreen> {
       awards: _awards.value ?? const [],
       readings: _readings.value ?? const [],
       lines: _lines.value ?? const [],
+      group: _group,
+      onGroup: (g) => setState(() => _group = g),
     );
   }
 }
@@ -1123,6 +1131,8 @@ class _ResultsView extends StatelessWidget {
     required this.awards,
     required this.readings,
     required this.lines,
+    required this.group,
+    required this.onGroup,
   });
 
   final BBEvent event;
@@ -1131,16 +1141,26 @@ class _ResultsView extends StatelessWidget {
   final List<Measurement> readings;
   final List<StatLine> lines;
 
+  /// The age group the top fives show, or null for everyone.
+  final String? group;
+  final ValueChanged<String?> onGroup;
+
   static String _name(String publicName) => publicName.isEmpty ? 'Private player' : publicName;
 
-  /// Each player's best fastball of the day, fastest first.
-  List<Measurement> get _fastballs {
-    final best = <String, Measurement>{};
-    for (final m in readings.where((m) => m.type == 'fastball')) {
-      if ((best[m.playerId]?.value ?? 0) < m.value) best[m.playerId] = m;
-    }
-    return (best.values.toList()..sort((a, b) => b.value.compareTo(a.value))).take(25).toList();
-  }
+  /// The boards each showcase keeps a top five for, and their units.
+  static const _tops = <String, ({String title, String unit})>{
+    'fastball': (title: 'Fastball', unit: 'MPH'),
+    'dash40': (title: '40-yard dash', unit: 'SEC'),
+    'homeRuns': (title: 'Home runs', unit: 'HR'),
+  };
+
+  /// Everything that can rank: the radar and stopwatch readings, and each
+  /// line's home runs.
+  List<Measurement> get _rankable => [...readings, for (final l in lines) l.homeRuns];
+
+  /// The top five on [type]'s board in [group], each player's best of the day.
+  List<Measurement> _top(String type, String? group) =>
+      bestReadings(_rankable, type, ageGroup: group).take(5).toList();
 
   List<Award> get _ranked {
     final order = awardTypes.keys.toList();
@@ -1165,7 +1185,6 @@ class _ResultsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wide = BB.isWide(context);
-    final fastballs = _fastballs;
     final ranked = _ranked;
     final batting = _batting;
     VoidCallback? profile(String playerId, String publicName) =>
@@ -1186,36 +1205,60 @@ class _ResultsView extends StatelessWidget {
               ),
           ], 14));
 
-    final Widget? fastballSection = fastballs.isEmpty
-        ? null
-        : _Section('Fastball', children: [
-            ..._spaced([
-              for (final (i, m) in fastballs.take(3).indexed)
-                MiniCard(
-                  rank: i + 1,
-                  first: i == 0,
-                  name: _name(m.publicName),
-                  sub: division(m.divisionName, m.gradYear),
-                  value: fmtValue(m.value, m.type),
-                  unit: 'MPH',
-                  onTap: profile(m.playerId, m.publicName),
-                ),
-            ], 9),
-            if (fastballs.length > 3) ...[
+    // The age groups with anything on a board, for the chips over the top fives.
+    final groups = [
+      for (final g in ageGroups)
+        if (_tops.keys.any((t) => _top(t, g).isNotEmpty)) g,
+    ];
+    final shown = groups.contains(group) ? group : null;
+    final tops = <Widget>[
+      for (final MapEntry(key: type, value: board) in _tops.entries)
+        if (_top(type, shown) case final top when top.isNotEmpty)
+          _Section('Top 5 ${board.title.toLowerCase()}', children: [
+            MiniCard(
+              rank: 1,
+              first: true,
+              name: _name(top.first.publicName),
+              sub: division(top.first.divisionName, top.first.gradYear),
+              value: fmtValue(top.first.value, type),
+              unit: board.unit,
+              onTap: profile(top.first.playerId, top.first.publicName),
+            ),
+            if (top.length > 1) ...[
               const SizedBox(height: 12),
               RuledPanel(children: [
-                for (final (i, m) in fastballs.indexed.skip(3))
+                for (final (i, m) in top.indexed.skip(1))
                   RuledRow(
                     rank: i + 1,
                     name: _name(m.publicName),
                     sub: m.divisionName,
-                    value: fmtValue(m.value, m.type),
-                    unit: 'MPH',
+                    value: fmtValue(m.value, type),
+                    unit: board.unit,
                     onTap: profile(m.playerId, m.publicName),
                   ),
               ]),
             ],
-          ]);
+          ]),
+    ];
+    final Widget? topSection = tops.isEmpty
+        ? null
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (groups.length > 1) ...[
+                Semantics(
+                  container: true,
+                  label: 'Age group',
+                  child: ChipRow(children: [
+                    BBChip('All', selected: shown == null, onTap: () => onGroup(null)),
+                    for (final g in groups) BBChip(g, selected: shown == g, onTap: () => onGroup(g)),
+                  ]),
+                ),
+                const SizedBox(height: 18),
+              ],
+              ..._spaced(tops, 36),
+            ],
+          );
 
     final Widget? battingSection = batting.isEmpty
         ? null
@@ -1249,7 +1292,7 @@ class _ResultsView extends StatelessWidget {
             ),
           ]);
 
-    final sections = [?awardsSection, ?fastballSection, ?battingSection];
+    final sections = [?topSection, ?awardsSection, ?battingSection];
     final head = [BackHeader(event.name), const PageTitle('Results')];
     if (loading || sections.isEmpty) {
       return PageFrame(
@@ -1264,7 +1307,7 @@ class _ResultsView extends StatelessWidget {
       return PageFrame(column: 640, children: [...head, ..._spaced(sections, 40)]);
     }
     // Desktop: the board at the left, honors and the box score beside it.
-    final left = [fastballSection ?? battingSection ?? awardsSection!];
+    final left = [topSection ?? battingSection ?? awardsSection!];
     final right = [for (final s in sections) if (!left.contains(s)) s];
     return PageFrame(
       children: [

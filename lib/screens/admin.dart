@@ -1108,7 +1108,8 @@ class _PaymentCheckView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final list = [...regs]
+    // Players an admin put on a showcase never paid through the app.
+    final list = [...regs.where((r) => !r.addedByStaff)]
       ..sort((a, b) => (b.markedPaidAt ?? DateTime(2000)).compareTo(a.markedPaidAt ?? DateTime(2000)));
     if (list.isEmpty) return const Quiet('Nothing marked paid yet.');
     // One total per app per week, newest week first.

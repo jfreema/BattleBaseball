@@ -187,12 +187,25 @@ service cloud.firestore {
         && get(doc('events', r.eventId)).data.status == 'open';
     }
 
+    // An event admin puts a player who is on file on the showcase, with no
+    // hold and no payment (Run > Check-in > Add player).
+    function staffAddsPlayer(regId) {
+      let r = request.resource.data;
+      return isEventAdmin(r.eventId)
+        && regId == r.eventId + '_' + r.playerId
+        && r.status == 'paid'
+        && r.paidVia == 'staff'
+        && r.addedBy == me()
+        && exists(doc('players', r.playerId))
+        && exists(doc('events', r.eventId));
+    }
+
     match /registrations/{regId} {
       allow get: if signedIn()
         && (resource == null || resource.data.guardianUid == me() || isEventStaff(resource.data.eventId));
       allow list: if signedIn()
         && (resource.data.guardianUid == me() || isEventStaff(resource.data.eventId));
-      allow create: if validNewRegistration(regId);
+      allow create: if validNewRegistration(regId) || staffAddsPlayer(regId);
       allow update: if isEventAdmin(resource.data.eventId)
         // Volunteers check players in and hand out jersey numbers.
         || (isEventStaff(resource.data.eventId) && onlyChanges(['jersey', 'status'])
