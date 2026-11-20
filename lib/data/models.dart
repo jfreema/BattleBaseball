@@ -765,3 +765,46 @@ List<Measurement> bestReadings(
       return by != 0 ? by : a.publicName.compareTo(b.publicName);
     });
 }
+
+/// Each player's home runs added up across showcases, most first, for the
+/// Leaders boards. With [ageGroup], only showcases where they played in that
+/// age group count. Each row's eventName says how many showcases it covers
+/// ("2 showcases"); players with none are left off.
+List<Measurement> totalHomeRuns(Iterable<Measurement> readings, {String? ageGroup}) {
+  final totals = <String, double>{};
+  final events = <String, Set<String>>{};
+  final first = <String, Measurement>{};
+  for (final m in readings) {
+    if (m.type != 'homeRuns' || m.value <= 0) continue;
+    if (ageGroup != null && m.ageGroup != ageGroup) continue;
+    totals[m.playerId] = (totals[m.playerId] ?? 0) + m.value;
+    (events[m.playerId] ??= {}).add(m.eventId);
+    first[m.playerId] ??= m;
+  }
+  final rows = [
+    for (final MapEntry(key: id, value: total) in totals.entries)
+      Measurement(
+        id: id,
+        eventId: '',
+        eventName: events[id]!.length == 1 ? '1 showcase' : '${events[id]!.length} showcases',
+        playerId: id,
+        publicName: first[id]!.publicName,
+        divisionName: first[id]!.divisionName,
+        gradYear: first[id]!.gradYear,
+        type: 'homeRuns',
+        value: total,
+        published: true,
+      ),
+  ];
+  return rows
+    ..sort((a, b) {
+      final by = b.value.compareTo(a.value);
+      return by != 0 ? by : a.publicName.compareTo(b.publicName);
+    });
+}
+
+/// A Leaders board: total home runs, or each player's best reading.
+List<Measurement> leaderRows(Iterable<Measurement> readings, String type, {String? ageGroup}) =>
+    type == 'homeRuns'
+        ? totalHomeRuns(readings, ageGroup: ageGroup)
+        : bestReadings(readings, type, ageGroup: ageGroup);

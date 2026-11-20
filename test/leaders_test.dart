@@ -88,4 +88,32 @@ void main() {
     expect(board.map((m) => m.playerId), ['nelson', 'uter']);
     expect(board.first.value, 2);
   });
+
+  test('the Leaders home run board adds up every showcase in the age group', () {
+    StatLine line(String player, int hr, String event, String division) => StatLine(
+          id: '${event}_$player',
+          eventId: event,
+          playerId: player,
+          publicName: player,
+          divisionName: division,
+          hr: hr,
+          ab: 4,
+        );
+    final readings = [
+      line('jimbo', 2, 'e1', '14U').homeRuns,
+      line('jimbo', 3, 'e2', '14U').homeRuns,
+      line('kearney', 3, 'e1', '14U').homeRuns,
+      line('kearney', 1, 'e2', '14U').homeRuns,
+      line('dolph', 0, 'e1', '14U').homeRuns,
+      line('nelson', 9, 'e1', '12U').homeRuns,
+    ];
+    final board = leaderRows(readings, 'homeRuns', ageGroup: '14U');
+    expect(board.map((m) => m.playerId), ['jimbo', 'kearney']);
+    expect(board.map((m) => m.value), [5, 4]);
+    expect(board.first.eventName, '2 showcases');
+    // Every other board still takes the best reading.
+    expect(leaderRows([_m('bart', 'fastball', 52, '10U'), _m('bart', 'fastball', 55, '10U', event: 'e2')], 'fastball')
+        .single
+        .value, 55);
+  });
 }

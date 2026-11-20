@@ -77,7 +77,7 @@ There are three age groups: **10U** (10 and under), **12U** (11 and 12) and **14
 - **Roster.** Families reserve spots, and an event admin can also put any player on file on a showcase: Staff tools > Run > Check-in > **Add player**, pick the player, then the age group (picked for them from the birth date on file, as of the showcase's day). That spot has no hold or payment (`paidVia: "staff"`) and stays out of Payment check; the x on its row takes the player back off. Picking from every player needs a Battle Baseball admin, who can read all players.
 - **Stats.** Every showcase records fastball velocity, the 40-yard dash and home runs; pop time only with the skills contest. Run > Stats lists the roster with each player's best fastball and 40 of the day and their line; tapping one opens a sheet with a fastball and 40-yard field (each adds a reading) and the scorebook steppers, home runs included. Run > Measure still takes readings by jersey number.
 - **Each showcase's results** show a top 5 for fastball, the 40 (quickest first) and home runs, each player's best of the day, with chips to narrow them to one age group.
-- **Leaders** has a board for each stat in each age group: every player's best from all published showcases, with the showcase it came from. Home runs rank by the most in one showcase. Only players with public cards are listed.
+- **Leaders** has a board for each stat in each age group: every player's best from all published showcases, with the showcase it came from. Home runs are each player's total across those showcases (in that age group). Only players with public cards are listed.
 
 ## Sample players
 
