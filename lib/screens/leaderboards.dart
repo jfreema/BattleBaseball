@@ -1,5 +1,6 @@
-// Leaders: one board per stat and age group (10U, 12U, 14U), each player's
-// best from every showcase. The top three are mini cards, the rest sit on one
+// Leaders: one board per stat and age group (10U, 12U, 14U): each player's
+// best fastball, 40 and pop time from every showcase, and their home runs
+// added up. The top three are mini cards, the rest sit on one
 // ruled panel.
 import 'dart:async';
 
@@ -130,7 +131,7 @@ class _LeadersView extends StatelessWidget {
     final wide = BB.isWide(context);
     final live = [
       for (final t in _boards.keys)
-        if (bestReadings(readings[t] ?? const [], t).isNotEmpty) t,
+        if (leaderRows(readings[t] ?? const [], t).isNotEmpty) t,
     ];
     // The chosen board, unless it is empty and another one isn't.
     final board = live.isEmpty || live.contains(type) ? type : live.first;
@@ -138,10 +139,10 @@ class _LeadersView extends StatelessWidget {
     // The age group picked, or else the youngest with readings on this board.
     final filled = [
       for (final g in ageGroups)
-        if (bestReadings(all, board, ageGroup: g).isNotEmpty) g,
+        if (leaderRows(all, board, ageGroup: g).isNotEmpty) g,
     ];
     final age = group ?? filled.firstOrNull ?? ageGroups.first;
-    final list = bestReadings(all, board, ageGroup: age).take(_places).toList();
+    final list = leaderRows(all, board, ageGroup: age).take(_places).toList();
     final unit = board == 'homeRuns' ? 'HR' : measurementTypes[board]?.unit ?? '';
     void open(Measurement m) => context.go('/players/${m.playerId}');
 
