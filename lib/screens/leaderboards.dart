@@ -21,8 +21,9 @@ const _boards = <String, String>{
   'popTime': 'Pop time',
 };
 
-/// How many places a board lists.
-const _places = 50;
+/// How many places a board lists. Only the top performers are public for
+/// now, not everyone who played.
+const _places = 10;
 
 class LeaderboardsScreen extends StatefulWidget {
   const LeaderboardsScreen({super.key});

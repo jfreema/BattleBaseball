@@ -1074,6 +1074,8 @@ class _EventResultsScreenState extends State<EventResultsScreen> {
   @override
   void initState() {
     super.initState();
+    // Whether the batting table shows depends on who is looking.
+    Session.instance.addListener(_changed);
     _watch();
   }
 
@@ -1101,6 +1103,7 @@ class _EventResultsScreenState extends State<EventResultsScreen> {
 
   @override
   void dispose() {
+    Session.instance.removeListener(_changed);
     _event.cancel();
     _awards.cancel();
     _readings.cancel();
@@ -1118,6 +1121,7 @@ class _EventResultsScreenState extends State<EventResultsScreen> {
       awards: _awards.value ?? const [],
       readings: _readings.value ?? const [],
       lines: _lines.value ?? const [],
+      boxScore: Session.instance.isEventAdmin(e.id),
       group: _group,
       onGroup: (g) => setState(() => _group = g),
     );
@@ -1131,6 +1135,7 @@ class _ResultsView extends StatelessWidget {
     required this.awards,
     required this.readings,
     required this.lines,
+    required this.boxScore,
     required this.group,
     required this.onGroup,
   });
@@ -1140,6 +1145,10 @@ class _ResultsView extends StatelessWidget {
   final List<Award> awards;
   final List<Measurement> readings;
   final List<StatLine> lines;
+
+  /// Whether the full batting table shows: it lists everyone who batted, so
+  /// it's for the showcase's admins. The public sees the top fives.
+  final bool boxScore;
 
   /// The age group the top fives show, or null for everyone.
   final String? group;
@@ -1186,7 +1195,7 @@ class _ResultsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final wide = BB.isWide(context);
     final ranked = _ranked;
-    final batting = _batting;
+    final batting = boxScore ? _batting : const <StatLine>[];
     VoidCallback? profile(String playerId, String publicName) =>
         publicName.isEmpty ? null : () => context.go('/players/$playerId');
     String division(String name, int? gradYear) =>
