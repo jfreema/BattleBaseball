@@ -148,8 +148,12 @@ service cloud.firestore {
         && request.resource.data.name == p.publicName;
     }
 
+    // Anyone may open one card by its link (the leaderboards, a showcase's
+    // top fives and a family's shared link all lead to one), but only Battle
+    // Baseball admins may list them all: the Players directory is theirs.
     match /publicProfiles/{playerId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if isAdmin();
       allow create, update: if validPublicProfile(playerId);
       allow delete: if guardianOf(playerId) || isAdmin();
     }

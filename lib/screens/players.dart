@@ -1,5 +1,6 @@
-// Players: the directory of public cards, a player's profile (the card,
-// opened up), and the form a parent fills in once for each kid.
+// Players: the directory of public cards (Battle Baseball admins only), a
+// family's own players, a player's profile (the card, opened up), and the
+// form a parent fills in once for each kid.
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -30,6 +31,25 @@ String? _signedInUid() {
   return s.signedIn ? s.uid : null;
 }
 
+/// What /players is called: the directory for admins, and for a family only
+/// its own players.
+String get _playersLabel => Session.instance.isAdmin ? 'Players' : 'Your players';
+
+/// Where a profile's back chevron leads. Admins go back to the directory and
+/// a family to its own players; anyone else came from the boards, or from
+/// Home for the sample card.
+(String label, String path) _profileBack({bool own = false, bool sample = false}) {
+  if (Session.instance.isAdmin) return ('Players', '/players');
+  if (own) return ('Your players', '/players');
+  if (sample) return ('Home', '/');
+  return ('Leaders', '/leaders');
+}
+
+Widget _profileHeader(BuildContext context, {bool own = false, bool sample = false, Widget? beside}) {
+  final (label, path) = _profileBack(own: own, sample: sample);
+  return BackHeader(label, beside: beside, onBack: () => context.go(path));
+}
+
 // ---------- Players ----------
 
 class PlayersScreen extends StatefulWidget {
@@ -40,10 +60,12 @@ class PlayersScreen extends StatefulWidget {
 }
 
 class _PlayersScreenState extends State<PlayersScreen> {
-  late final Stream<List<PublicProfile>> _all = Repo.instance.allPublicProfiles();
-  late final Stream<List<Measurement>> _board = Repo.instance.leaderboard('fastball');
+  Stream<List<PublicProfile>>? _all;
+  Stream<List<Measurement>>? _board;
   Stream<List<Player>>? _mine;
   String? _uid;
+  bool _admin = false;
+  bool _ready = false;
 
   @override
   void initState() {
@@ -59,12 +81,20 @@ class _PlayersScreenState extends State<PlayersScreen> {
   }
 
   void _bind() {
+    final s = Session.instance;
     _uid = _signedInUid();
+    _ready = s.ready;
+    _admin = s.isAdmin;
     _mine = _uid == null ? null : Repo.instance.myPlayers();
+    // Only Battle Baseball admins get the directory of every public card;
+    // Firestore won't list it for anyone else.
+    _all = _admin ? Repo.instance.allPublicProfiles() : null;
+    _board = _admin ? Repo.instance.leaderboard('fastball') : null;
   }
 
   void _onSession() {
-    if (mounted && _signedInUid() != _uid) setState(_bind);
+    final s = Session.instance;
+    if (mounted && (_signedInUid() != _uid || s.isAdmin != _admin || s.ready != _ready)) setState(_bind);
   }
 
   @override
@@ -75,11 +105,15 @@ class _PlayersScreenState extends State<PlayersScreen> {
           builder: (context, all) => StreamBuilder<List<Measurement>>(
             stream: _board,
             builder: (context, board) => _PlayersView(
-              loading: !(all.hasData || all.hasError) ||
+              admin: _admin,
+              // Until the session knows who this is, it can't know whether
+              // there's a directory to show.
+              loading: !_ready ||
+                  (_all != null && !(all.hasData || all.hasError)) ||
                   (_mine != null && !(mine.hasData || mine.hasError)),
               mine: _mine == null ? null : (mine.data ?? const []),
               // A directory that can't be read yet is an empty directory.
-              profiles: all.data ?? const [],
+              profiles: _all == null ? null : (all.data ?? const []),
               tops: {for (final m in board.data ?? const <Measurement>[]) m.playerId: m.value},
             ),
           ),
@@ -89,17 +123,23 @@ class _PlayersScreenState extends State<PlayersScreen> {
 
 class _PlayersView extends StatefulWidget {
   const _PlayersView({
+    required this.admin,
     required this.loading,
     required this.mine,
     required this.profiles,
     required this.tops,
   });
 
+  /// A Battle Baseball admin, for whom this is the Players tab.
+  final bool admin;
   final bool loading;
 
   /// The signed-in family's players; null when nobody is signed in.
   final List<Player>? mine;
-  final List<PublicProfile> profiles;
+
+  /// Every public card, for Battle Baseball admins; null for anyone else,
+  /// who sees only their own players here.
+  final List<PublicProfile>? profiles;
 
   /// The best published fastball, by player id.
   final Map<String, double> tops;
@@ -170,20 +210,25 @@ class _PlayersViewState extends State<_PlayersView> {
     final width = MediaQuery.sizeOf(context).width;
     final columns = width >= 1100 ? 3 : width >= 720 ? 2 : 1;
     final mine = widget.mine;
+    final directory = widget.profiles;
     final q = _query.trim().toLowerCase();
-    final shown = q.isEmpty
-        ? widget.profiles
-        : widget.profiles.where((p) => p.name.toLowerCase().contains(q)).toList();
+    final listed = directory ?? const <PublicProfile>[];
+    final shown = q.isEmpty ? listed : listed.where((p) => p.name.toLowerCase().contains(q)).toList();
     return PageFrame(
       children: [
-        const TabHeader(),
-        const PageTitle('Players'),
+        // Players is a tab for admins; a family reaches its own from Account.
+        if (widget.admin)
+          const TabHeader()
+        else
+          BackHeader('Account', onBack: () => context.go('/account')),
+        PageTitle(widget.admin ? 'Players' : 'Your players'),
         if (widget.loading)
           const LoadingField()
         else ...[
           if (mine != null) ...[
             if (mine.isNotEmpty) ...[
-              const SectionTitle('Your players'),
+              // A family's page is already called Your players.
+              if (widget.admin) const SectionTitle('Your players'),
               _Grid(columns: columns, children: [for (final p in mine) _OwnTile(player: p)]),
               const SizedBox(height: 16),
             ],
@@ -194,7 +239,10 @@ class _PlayersViewState extends State<_PlayersView> {
             ),
             const SizedBox(height: 36),
           ],
-          if (widget.profiles.isEmpty)
+          if (directory == null) ...[
+            // A family with no players yet sees what a card looks like.
+            if (mine == null || mine.isEmpty) const _SampleCard(),
+          ] else if (directory.isEmpty)
             const _SampleCard()
           else ...[
             if (mine != null) const SectionTitle('All players'),
@@ -509,7 +557,7 @@ class _ProfileLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      const PageFrame(children: [BackHeader('Players'), LoadingField()]);
+      PageFrame(children: [_profileHeader(context), const LoadingField()]);
 }
 
 /// A player's results, worked into what the card prints.
@@ -766,7 +814,7 @@ class _ProfileView extends StatelessWidget {
   Widget build(BuildContext context) {
     final wide = BB.isWide(context);
     final r = _Results(readings, awards, statLines);
-    final header = BackHeader('Players', beside: sample ? const Stamp('SAMPLE') : null);
+    final header = _profileHeader(context, own: own, sample: sample, beside: sample ? const Stamp('SAMPLE') : null);
     Widget front(double width) => PlayerCard(
           profile: profile,
           topFastball: r.topFastball,
@@ -1094,7 +1142,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
   Widget build(BuildContext context) {
     if (_missing) return const NotFoundScreen();
     final editing = widget.playerId != null;
-    final back = BackHeader(editing ? 'Card' : 'Players');
+    final back = BackHeader(editing ? 'Card' : _playersLabel);
     if (!_loaded) {
       return PageFrame(column: 560, children: [back, const LoadingField()]);
     }

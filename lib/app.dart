@@ -75,6 +75,10 @@ GoRouter _appRouter() => GoRouter(
       return state.uri.queryParameters['from'] ?? '/';
     }
     if (path.startsWith('/admin') && !s.hasStaffTools) return '/';
+    // The directory of every player is for Battle Baseball admins. A family
+    // signed in sees only its own players there; anyone else gets the boards,
+    // which show the top performers.
+    if (path == '/players' && !s.signedIn) return '/leaders';
     return null;
   },
   errorBuilder: (context, state) =>
@@ -208,16 +212,20 @@ class AppShell extends StatelessWidget {
   final String location;
   final Widget child;
 
-  static const _paths = ['/events', '/players', '/', '/leaders', '/account'];
-
-  /// Which of the five tabs the current screen belongs to, or -1. The shop
-  /// is 5: a link of its own in the top bar, no tab on phones.
-  int get _tab {
+  /// Which tab the current screen belongs to, or -1: 0 Showcases, 1 Players,
+  /// 2 Home, 3 Leaders, 4 Account, 5 Merch. Players is a tab only for Battle
+  /// Baseball admins ([admin]); for anyone else /players is their own
+  /// players, reached from Account.
+  int _tab(bool admin) {
     bool under(String root) => location == root || location.startsWith('$root/');
     if (under('/merch')) return 5;
     if (location == '/' || under('/host')) return 2;
     if (under('/events')) return 0;
-    if (under('/players')) return 1;
+    if (under('/players')) {
+      if (admin) return 1;
+      final own = location == '/players' || location == '/players/new' || location.endsWith('/edit');
+      return own ? 4 : -1;
+    }
     if (under('/leaders')) return 3;
     if (under('/account') || under('/admin')) return 4;
     return -1;
@@ -226,33 +234,44 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wide = BB.isWide(context);
-    if (wide) {
-      return Scaffold(
-        body: Column(
-          children: [
-            // Like the bottom bar, the top bar's words only grow so far.
-            MediaQuery.withClampedTextScaling(
-              maxScaleFactor: 1.15,
-              child: _TopBar(tab: _tab, location: location),
+    // Who is signed in decides whether Players is a tab.
+    return ListenableBuilder(
+      listenable: Session.instance,
+      builder: (context, _) {
+        final admin = Session.instance.isAdmin;
+        final tab = _tab(admin);
+        if (wide) {
+          return Scaffold(
+            body: Column(
+              children: [
+                // Like the bottom bar, the top bar's words only grow so far.
+                MediaQuery.withClampedTextScaling(
+                  maxScaleFactor: 1.15,
+                  child: _TopBar(tab: tab, location: location, admin: admin),
+                ),
+                Expanded(child: MediaQuery.removePadding(context: context, removeTop: true, child: child)),
+              ],
             ),
-            Expanded(child: MediaQuery.removePadding(context: context, removeTop: true, child: child)),
-          ],
-        ),
-      );
-    }
-    // On phones each screen's own header carries the sample-data stamp.
-    return Scaffold(
-      extendBody: true,
-      body: child,
-      bottomNavigationBar: _BottomBar(tab: _tab, onTap: (i) => context.go(_paths[i])),
+          );
+        }
+        // On phones each screen's own header carries the sample-data stamp.
+        return Scaffold(
+          extendBody: true,
+          body: child,
+          bottomNavigationBar: _BottomBar(tab: tab, admin: admin),
+        );
+      },
     );
   }
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.tab, required this.location});
+  const _TopBar({required this.tab, required this.location, required this.admin});
   final int tab;
   final String location;
+
+  /// A Battle Baseball admin, who also gets Players.
+  final bool admin;
 
   @override
   Widget build(BuildContext context) {
@@ -339,8 +358,10 @@ class _TopBar extends StatelessWidget {
                       children: [
                         link('Showcases', 0, '/events'),
                         const SizedBox(width: 4),
-                        link('Players', 1, '/players'),
-                        const SizedBox(width: 4),
+                        if (admin) ...[
+                          link('Players', 1, '/players'),
+                          const SizedBox(width: 4),
+                        ],
                         link('Leaders', 3, '/leaders'),
                         const SizedBox(width: 4),
                         link('Merch', 5, '/merch'),
@@ -386,19 +407,22 @@ class _TopBar extends StatelessWidget {
 const _plateRise = 20.0;
 
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.tab, required this.onTap});
+  const _BottomBar({required this.tab, required this.admin});
   final int tab;
-  final ValueChanged<int> onTap;
+
+  /// A Battle Baseball admin gets Players beside Showcases; everyone else
+  /// gets Merch there.
+  final bool admin;
 
   @override
   Widget build(BuildContext context) {
     final inset = MediaQuery.paddingOf(context).bottom;
-    Widget item(int index, String label, BBGlyph glyph) => Expanded(
+    Widget item(int index, String label, BBGlyph glyph, String path) => Expanded(
           child: _TabItem(
             label: label,
             glyph: glyph,
             selected: tab == index,
-            onTap: () => onTap(index),
+            onTap: () => context.go(path),
           ),
         );
     return MediaQuery.withClampedTextScaling(
@@ -426,11 +450,14 @@ class _BottomBar extends StatelessWidget {
               height: 67.5,
               child: Row(
                 children: [
-                  item(0, 'Showcases', BBGlyph.pennant),
-                  item(1, 'Players', BBGlyph.card),
+                  item(0, 'Showcases', BBGlyph.pennant, '/events'),
+                  if (admin)
+                    item(1, 'Players', BBGlyph.card, '/players')
+                  else
+                    item(5, 'Merch', BBGlyph.bag, '/merch'),
                   const SizedBox(width: 78),
-                  item(3, 'Leaders', BBGlyph.bars),
-                  item(4, 'Account', BBGlyph.jersey),
+                  item(3, 'Leaders', BBGlyph.bars, '/leaders'),
+                  item(4, 'Account', BBGlyph.jersey, '/account'),
                 ],
               ),
             ),
@@ -442,7 +469,7 @@ class _BottomBar extends StatelessWidget {
               child: Center(
                 child: SizedBox(
                   width: 78,
-                  child: _HomeTab(selected: tab == 2, onTap: () => onTap(2)),
+                  child: _HomeTab(selected: tab == 2, onTap: () => context.go('/')),
                 ),
               ),
             ),
