@@ -1,13 +1,17 @@
 // Who sees Players: the directory of every player is for Battle Baseball
 // admins. A family sees only its own players there, and the bars give
-// everyone else Merch where Players was.
+// everyone else Merch where Players was. Only top performers are public:
+// Leaders lists a top 10, and a showcase's full batting table is for its
+// admins.
 import 'dart:convert';
 
 import 'package:battle_baseball/app.dart';
 import 'package:battle_baseball/data/demo.dart';
+import 'package:battle_baseball/data/models.dart';
 import 'package:battle_baseball/data/repo.dart';
 import 'package:battle_baseball/data/session.dart';
 import 'package:battle_baseball/design/bb.dart';
+import 'package:battle_baseball/design/card.dart';
 import 'package:battle_baseball/screens/common.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -55,6 +59,29 @@ Future<void> _app(WidgetTester t, String location) async {
   await t.pumpWidget(const SizedBox());
   await t.pumpWidget(const BattleBaseballApp());
   await _settle(t);
+}
+
+/// Sample data with fifteen 10U fastballs on the board, more than it lists.
+class _CrowdedBoard extends DemoRepo {
+  @override
+  Stream<List<Measurement>> readings(String type) => Stream.value([
+        if (type == 'fastball')
+          for (var i = 0; i < 15; i++)
+            Measurement(
+              id: 'm$i',
+              eventId: DemoRepo.fallId,
+              eventName: 'Fall Showcase',
+              playerId: 'p$i',
+              publicName: 'Player $i',
+              divisionName: '10U',
+              type: 'fastball',
+              value: 50.0 + i,
+              published: true,
+            ),
+      ]);
+
+  @override
+  Stream<List<Measurement>> homeRunReadings() => Stream.value(const []);
 }
 
 Finder _back(String label) => find.byWidgetPredicate((w) => w is BackHeader && w.label == label);
@@ -167,6 +194,36 @@ void main() {
     await t.tap(find.byWidgetPredicate((w) => w is Pressable && w.label == 'Back to Leaders'));
     await _settle(t);
     expect(router.routerDelegate.currentConfiguration.uri.path, '/leaders');
+    await t.pumpWidget(const SizedBox());
+  });
+
+  testWidgets("a showcase's full batting table is for its admins; everyone sees the top fives", (t) async {
+    addTearDown(t.view.reset);
+    addTearDown(() => router.go('/'));
+    await _app(t, '/events/${DemoRepo.fallId}/results');
+    expect(t.takeException(), isNull);
+    expect(find.text('Top 5 fastball'), findsOneWidget);
+    expect(find.text('Batting'), findsNothing);
+
+    Session.instance.role = 'admin';
+    await _app(t, '/events/${DemoRepo.fallId}/results');
+    expect(t.takeException(), isNull);
+    expect(find.text('Top 5 fastball'), findsOneWidget);
+    await t.scrollUntilVisible(find.text('Batting'), 300, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Batting'), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a Leaders board lists a top 10, not everyone who played', (t) async {
+    addTearDown(t.view.reset);
+    addTearDown(() => router.go('/'));
+    Repo.instance = _CrowdedBoard();
+    await _app(t, '/leaders');
+    expect(t.takeException(), isNull);
+    final places = find.byType(MiniCard).evaluate().length + find.byType(RuledRow).evaluate().length;
+    expect(places, 10);
+    expect(find.text('Player 14'), findsOneWidget); // the fastest
+    expect(find.text('Player 4'), findsNothing); // 11th
     await t.pumpWidget(const SizedBox());
   });
 }
