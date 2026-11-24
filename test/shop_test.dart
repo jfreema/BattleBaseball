@@ -651,6 +651,39 @@ void main() {
       expect(p.photoFor({'Size': 'S'}), isNull, reason: 'two colors, two photos');
       expect(p.photoFor({}), isNull);
     });
+
+    test('picking a color shows its photo when adult and youth have their own', () {
+      const white = ShopImage('$_cdn/white-adult.jpg'), whiteKids = ShopImage('$_cdn/white-youth.jpg');
+      const grey = ShopImage('$_cdn/grey-adult.jpg'), greyKids = ShopImage('$_cdn/grey-youth.jpg');
+      const adult = 'Gildan G185 Adult Heavy Blend Hood', youth = 'Gildan G185B Youth Heavy Blend Hood';
+      const p = ShopProduct(
+        handle: 'cyclone-hoodie',
+        title: 'Cyclone Hoodie',
+        minPrice: 30,
+        maxPrice: 32,
+        images: [ShopImage('$_cdn/lifestyle.webp'), grey, white, whiteKids, greyKids],
+        options: [
+          ShopOption('Color', ['White', 'Graphite Heather']),
+          ShopOption('Size', ['S', 'M', 'YS']),
+          ShopOption('Product', [youth, adult]),
+        ],
+        variants: [
+          ShopVariant(id: 'g-s', price: 30, options: {'Color': 'Graphite Heather', 'Size': 'S', 'Product': adult}, image: grey),
+          ShopVariant(id: 'g-m', price: 30, options: {'Color': 'Graphite Heather', 'Size': 'M', 'Product': adult}, image: grey),
+          ShopVariant(id: 'w-s', price: 30, options: {'Color': 'White', 'Size': 'S', 'Product': adult}, image: white),
+          ShopVariant(id: 'w-m', price: 30, options: {'Color': 'White', 'Size': 'M', 'Product': adult}, image: white),
+          ShopVariant(id: 'w-ys', price: 30, options: {'Color': 'White', 'Size': 'YS', 'Product': youth}, image: whiteKids),
+          ShopVariant(id: 'g-ys', price: 30, options: {'Color': 'Graphite Heather', 'Size': 'YS', 'Product': youth}, image: greyKids),
+        ],
+      );
+      expect([for (final c in p.choices) c.name], ['Color', 'Size'], reason: 'adult or youth follows from the size');
+      expect(p.photoFor({'Color': 'White'}), 2, reason: 'the adult photo, listed first');
+      expect(p.photoFor({'Color': 'Graphite Heather'}), 1);
+      expect(p.photoFor({'Color': 'White', 'Size': 'YS'}), 3);
+      expect(p.photoFor({'Color': 'Graphite Heather', 'Size': 'YS'}), 4);
+      expect(p.photoFor({'Size': 'M'}), isNull, reason: 'two colors, two photos');
+      expect(p.photoFor({}), isNull);
+    });
   });
 
   group('Storefront', () {

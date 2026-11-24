@@ -150,19 +150,29 @@ class ShopProduct {
 
   /// Where in [images] the photo for what's been picked is: when every
   /// variant that fits the picks has the same photo (a color's own mockup),
-  /// its place. Null when they differ, or none of them has one.
+  /// its place. The adult and youth shirts of one color can each have their
+  /// own photo; picking just the color shows the first of them, since the
+  /// size, not a separate pick, says which shirt it is. Null when the photos
+  /// differ by anything else still to pick (picking a size on a shirt with
+  /// two colors), or none of them has one.
   int? photoFor(Map<String, String> picked) {
-    String? photo;
+    // The options the shopper doesn't pick: their value follows from the
+    // size ("Product": the adult or the youth shirt).
+    final picks = {for (final c in choices) c.name};
+    final headings = [for (final o in options) if (o.values.length > 1 && !picks.contains(o.name)) o.name];
+    String? first;
+    final byShirt = <String, String>{};
     for (final v in variants) {
       if (!picked.entries.every((e) => v.options[e.key] == e.value)) continue;
       final url = v.image?.url;
       if (url == null) continue;
       final at = _photoPath(url);
-      if (photo != null && photo != at) return null;
-      photo = at;
+      first ??= at;
+      final shirt = [for (final h in headings) v.options[h]].join('\u0000');
+      if ((byShirt[shirt] ??= at) != at) return null;
     }
-    if (photo == null) return null;
-    final i = images.indexWhere((im) => _photoPath(im.url) == photo);
+    if (first == null) return null;
+    final i = images.indexWhere((im) => _photoPath(im.url) == first);
     return i < 0 ? null : i;
   }
 
