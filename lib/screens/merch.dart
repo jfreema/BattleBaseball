@@ -1800,6 +1800,8 @@ class _ProductScreenState extends State<ProductScreen> {
           if (later && v != null && !p.offers(c.name, v, _picked)) _picked.remove(c.name);
           if (c.name == name) later = true;
         }
+        // Show the picked color's own photo, when it has one.
+        _photo = p.photoFor(_picked) ?? _photo;
       });
 
   void _add(ShopProduct p, ShopVariant v) {

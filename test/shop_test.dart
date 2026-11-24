@@ -625,6 +625,32 @@ void main() {
       expect(photo.sized(640), 'assets/merch/sample-coral.jpg');
       expect(const ShopImage('$_cdn/tee.png').isAsset, isFalse);
     });
+
+    test("picking a color finds that color's own photo", () {
+      const royal = ShopImage('$_cdn/royal-mockup.png?v=1'), seafoam = ShopImage('$_cdn/seafoam-mockup.png?v=1');
+      const p = ShopProduct(
+        handle: 'battle-baseball-performance-tee',
+        title: 'Battle Baseball Performance Tee',
+        minPrice: 24,
+        maxPrice: 28,
+        images: [ShopImage('$_cdn/seafoam-mockup.png?v=2'), ShopImage('$_cdn/royal-mockup.png?v=2')],
+        options: [
+          ShopOption('Color', ['Bright Seafoam', 'True Royal']),
+          ShopOption('Size', ['S', 'YS']),
+        ],
+        variants: [
+          ShopVariant(id: 'bs-s', price: 25, options: {'Color': 'Bright Seafoam', 'Size': 'S'}, image: seafoam),
+          ShopVariant(id: 'bs-ys', price: 24, options: {'Color': 'Bright Seafoam', 'Size': 'YS'}, image: seafoam),
+          ShopVariant(id: 'tr-s', price: 25, options: {'Color': 'True Royal', 'Size': 'S'}, image: royal),
+          ShopVariant(id: 'tr-ys', price: 24, options: {'Color': 'True Royal', 'Size': 'YS'}),
+        ],
+      );
+      expect(p.photoFor({'Color': 'True Royal'}), 1, reason: 'the same file, whatever its version');
+      expect(p.photoFor({'Color': 'Bright Seafoam'}), 0);
+      expect(p.photoFor({'Color': 'True Royal', 'Size': 'YS'}), isNull, reason: 'that variant has no photo');
+      expect(p.photoFor({'Size': 'S'}), isNull, reason: 'two colors, two photos');
+      expect(p.photoFor({}), isNull);
+    });
   });
 
   group('Storefront', () {

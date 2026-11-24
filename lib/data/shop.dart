@@ -148,6 +148,27 @@ class ShopProduct {
         before.every((n) => picked[n] == null || v.options[n] == picked[n]));
   }
 
+  /// Where in [images] the photo for what's been picked is: when every
+  /// variant that fits the picks has the same photo (a color's own mockup),
+  /// its place. Null when they differ, or none of them has one.
+  int? photoFor(Map<String, String> picked) {
+    String? photo;
+    for (final v in variants) {
+      if (!picked.entries.every((e) => v.options[e.key] == e.value)) continue;
+      final url = v.image?.url;
+      if (url == null) continue;
+      final at = _photoPath(url);
+      if (photo != null && photo != at) return null;
+      photo = at;
+    }
+    if (photo == null) return null;
+    final i = images.indexWhere((im) => _photoPath(im.url) == photo);
+    return i < 0 ? null : i;
+  }
+
+  /// A photo's address without its version, so the same file matches.
+  static String _photoPath(String url) => url.split('?').first;
+
   /// A variant in a few words, for a cart line: "Size YM".
   String describe(ShopVariant v) => [
         for (final c in choices) '${c.name} ${c.label(v.options[c.name] ?? '')}'.trim(),
