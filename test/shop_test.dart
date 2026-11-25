@@ -311,7 +311,7 @@ class _Shopify implements ShopBackend {
 
   @override
   Future<({String cartId, Uri url, Map<String, int> accepted})> startCheckout(List<CartLine> lines) async {
-    final sent = {for (final l in lines) l.variantId: l.qty};
+    final sent = {for (final l in lines) l.key: l.qty};
     checkouts.add(sent);
     if (checkoutError case final e?) throw e;
     return (cartId: made.cartId, url: made.url, accepted: accept ?? sent);
@@ -1005,6 +1005,70 @@ void main() {
       expect(made.accepted, {_id('YM'): 2});
     });
 
+    test('a line with a jersey number sends it as an attribute, and the number tells lines apart', () async {
+      final sent = <http.Request>[];
+      final api = _storefront(
+        sent,
+        () => _json({
+          'data': {
+            'cartCreate': {
+              'cart': {
+                'id': 'gid://shopify/Cart/c1?key=k',
+                'checkoutUrl': 'https://t03zrq-mv.myshopify.com/cart/c/c1?key=k',
+                'lines': {
+                  'nodes': [
+                    {
+                      'quantity': 1,
+                      'attributes': [
+                        {'key': 'Jersey number', 'value': '23'},
+                      ],
+                      'merchandise': {'id': _id('YM')},
+                    },
+                    {
+                      'quantity': 0,
+                      'attributes': [
+                        {'key': 'Jersey number', 'value': '7'},
+                      ],
+                      'merchandise': {'id': _id('YM')},
+                    },
+                  ],
+                },
+              },
+              'userErrors': <Object?>[],
+              'warnings': <Object?>[],
+            },
+          },
+        }),
+      );
+      CartLine numbered(String number) =>
+          CartLine.fromJson({..._line('YM'), 'attributes': {'Jersey number': number}});
+      final a = numbered('23'), b = numbered('7');
+      await expectLater(
+        api.startCheckout([a, b]),
+        throwsA(isA<ShopLinesUnavailable>()
+            .having((e) => e.variantIds, 'variantIds', [b.key])
+            .having((e) => e.accepted, 'accepted', {a.key: 1, b.key: 0})),
+      );
+      expect(_body(sent.single)['variables'], {
+        'lines': [
+          {
+            'merchandiseId': _id('YM'),
+            'quantity': 1,
+            'attributes': [
+              {'key': 'Jersey number', 'value': '23'},
+            ],
+          },
+          {
+            'merchandiseId': _id('YM'),
+            'quantity': 1,
+            'attributes': [
+              {'key': 'Jersey number', 'value': '7'},
+            ],
+          },
+        ],
+      });
+    });
+
     test('variants() asks for every id at once and reads what is for sale and its price', () async {
       final sent = <http.Request>[];
       final api = _storefront(
@@ -1222,6 +1286,30 @@ void main() {
       expect(shop.count, 1);
       expect(shop.subtotal, 25);
       expect(shop.currency, 'USD');
+    });
+
+    test('a shirt tagged jersey-number takes a number, and each number is its own line', () {
+      final shop = Shop(_Shopify());
+      final plain = _parse(_tropicJson());
+      expect(plain.takesNumber, isFalse);
+      final tee = _parse({..._tropicJson(), 'tags': ['team-cyclones', 'jersey-number']});
+      expect(tee.takesNumber, isTrue);
+      shop
+        ..add(tee, _size(tee, 'YM'), 1, '23')
+        ..add(tee, _size(tee, 'YM'), 2, '23')
+        ..add(tee, _size(tee, 'YM'), 1, '7');
+      expect([for (final l in shop.lines) (l.detail, l.qty)], [('Size YM · No. 23', 3), ('Size YM · No. 7', 1)]);
+      expect([for (final l in shop.lines) l.attributes], [
+        {'Jersey number': '23'},
+        {'Jersey number': '7'},
+      ]);
+      final seven = shop.lines.last;
+      expect(seven.key, isNot(seven.variantId));
+      expect(CartLine.fromJson(jsonDecode(jsonEncode(seven.toJson())) as Map<String, dynamic>).key, seven.key);
+      shop.setQty(seven.key, 4);
+      expect(shop.lines.last.qty, 4);
+      shop.remove(seven.key);
+      expect(shop.lines.single.attributes, {'Jersey number': '23'});
     });
 
     test('adding a size already in the cart adds to its line, up to maxQty', () {

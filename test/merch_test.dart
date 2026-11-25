@@ -207,6 +207,27 @@ class _Hoodies extends SampleShop {
   Future<ShopProduct?> product(String handle) async => handle == hoodie.handle ? hoodie : super.product(handle);
 }
 
+/// The sample shirts plus a hoodie that takes a jersey number.
+class _Numbered extends SampleShop {
+  static final hoodie = ShopProduct(
+    handle: 'cyclone-hoodie-your-number',
+    title: 'Cyclone Hoodie - Your Number',
+    minPrice: 33,
+    maxPrice: 33,
+    tags: const ['team-cyclones', ShopProduct.numberTag],
+    options: const [
+      ShopOption('Size', ['S', 'L']),
+    ],
+    variants: [
+      for (final size in ['S', 'L'])
+        ShopVariant(id: 'sample/numbered/$size', price: 33, options: {'Size': size}),
+    ],
+  );
+
+  @override
+  Future<ShopProduct?> product(String handle) async => handle == hoodie.handle ? hoodie : super.product(handle);
+}
+
 /// The sample shirts plus a participating team's collection, the Cyclones,
 /// with one hoodie.
 class _Teams extends SampleShop {
@@ -410,6 +431,31 @@ void main() {
     await _tap(t, find.text('L'));
     await _tap(t, find.text('Add to cart'));
     expect(Shop.instance.lines.single.detail, 'Color Royal · Size L');
+    expect(t.takeException(), isNull);
+    await _close(t);
+  });
+
+  testWidgets('a shirt that takes a jersey number asks for one and puts it on the line', (t) async {
+    await _open(t, '/merch/$_tropic');
+    expect(find.text('JERSEY NUMBER'), findsNothing, reason: 'a plain shirt has no number box');
+    await _close(t);
+
+    Shop.instance = Shop(_Numbered());
+    await _open(t, '/merch/cyclone-hoodie-your-number');
+    expect(find.text('JERSEY NUMBER'), findsOneWidget);
+    await _tap(t, find.text('L'));
+    await _tap(t, find.text('Add to cart'));
+    expect(find.text('Add your jersey number.'), findsOneWidget);
+    expect(Shop.instance.lines, isEmpty);
+    await t.pump(const Duration(seconds: 5));
+
+    await t.enterText(find.byType(TextField), '2a37');
+    await t.pump();
+    expect(t.widget<TextField>(find.byType(TextField)).controller!.text, '23', reason: 'digits only, two at most');
+    await _tap(t, find.text('Add to cart'));
+    final line = Shop.instance.lines.single;
+    expect(line.detail, 'Size L · No. 23');
+    expect(line.attributes, {'Jersey number': '23'});
     expect(t.takeException(), isNull);
     await _close(t);
   });
