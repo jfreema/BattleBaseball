@@ -479,7 +479,7 @@ query Product(\$handle: String!) {
     handle title availableForSale descriptionHtml tags
     options { name optionValues { name } }
     featuredImage $_image
-    images(first: 12) { nodes $_image }
+    images(first: 30) { nodes $_image }
     priceRange { minVariantPrice $_money maxVariantPrice $_money }
     variants(first: 100) {
       nodes {
