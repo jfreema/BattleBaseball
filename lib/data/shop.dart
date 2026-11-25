@@ -96,6 +96,7 @@ class ShopProduct {
     this.descriptionHtml = '',
     this.options = const [],
     this.variants = const [],
+    this.tags = const [],
   });
 
   /// The product's name in its Shopify address, and in ours (`/merch/<handle>`).
@@ -112,6 +113,22 @@ class ShopProduct {
   final String descriptionHtml;
   final List<ShopOption> options;
   final List<ShopVariant> variants;
+
+  /// The product's Shopify tags. Read with the product in full, not with
+  /// the catalog.
+  final List<String> tags;
+
+  /// The tag that puts a jersey number on the back of a shirt.
+  static const numberTag = 'jersey-number';
+
+  /// What the shopper's number is called on the order: the name of the
+  /// field Ninja's personalization prints from, so it has to match the
+  /// field's label in Ninja exactly.
+  static const numberField = 'Jersey number';
+
+  /// Whether this shirt takes a jersey number, printed on the back. Ninja
+  /// prints it from the order; the tag says to ask for one.
+  bool get takesNumber => tags.contains(numberTag);
 
   ShopImage? get image => images.isEmpty ? null : images.first;
 
@@ -202,6 +219,7 @@ class ShopProduct {
       available: (j['availableForSale'] as bool?) ?? true,
       images: images.isEmpty && featured != null ? [featured] : images,
       descriptionHtml: (j['descriptionHtml'] as String?) ?? '',
+      tags: [for (final t in (j['tags'] as List?) ?? const []) if (t is String) t],
       options: [
         for (final o in (j['options'] as List?) ?? const [])
           ShopOption(
@@ -398,6 +416,9 @@ class ShopFailure extends ShopException {
 /// or not enough left. [accepted] says how many of each variant it did take.
 class ShopLinesUnavailable extends ShopException {
   const ShopLinesUnavailable(this.variantIds, {this.accepted = const {}});
+
+  /// The lines, by [CartLine.key]: the variant's id, unless the line has a
+  /// number to print.
   final List<String> variantIds;
   final Map<String, int> accepted;
 }
@@ -455,7 +476,7 @@ query Catalog {
   static const _product = '''
 query Product(\$handle: String!) {
   product(handle: \$handle) {
-    handle title availableForSale descriptionHtml
+    handle title availableForSale descriptionHtml tags
     options { name optionValues { name } }
     featuredImage $_image
     images(first: 12) { nodes $_image }
@@ -477,7 +498,9 @@ mutation Checkout(\$lines: [CartLineInput!]!) {
   cartCreate(input: { lines: \$lines }) {
     cart {
       id checkoutUrl
-      lines(first: 100) { nodes { quantity merchandise { ... on ProductVariant { id } } } }
+      lines(first: 100) {
+        nodes { quantity attributes { key value } merchandise { ... on ProductVariant { id } } }
+      }
     }
     userErrors { field message }
     warnings { code target message }
@@ -563,13 +586,25 @@ query Variants(\$ids: [ID!]!) {
   @override
   Future<({String cartId, Uri url, Map<String, int> accepted})> startCheckout(List<CartLine> lines) async {
     // What's sent, read now: the cart can change while Shopify answers.
+    // Lines are told apart by [CartLine.key]: the variant, and the number
+    // to print on it if there is one.
     final sent = <String, int>{};
+    final byKey = <String, CartLine>{};
     for (final l in lines) {
-      sent[l.variantId] = (sent[l.variantId] ?? 0) + l.qty;
+      sent[l.key] = (sent[l.key] ?? 0) + l.qty;
+      byKey[l.key] ??= l;
     }
     final data = await _run(_checkout, {
       'lines': [
-        for (final e in sent.entries) {'merchandiseId': e.key, 'quantity': e.value},
+        for (final e in sent.entries)
+          {
+            'merchandiseId': byKey[e.key]!.variantId,
+            'quantity': e.value,
+            if (byKey[e.key]!.attributes.isNotEmpty)
+              'attributes': [
+                for (final a in byKey[e.key]!.attributes.entries) {'key': a.key, 'value': a.value},
+              ],
+          },
       ],
     });
     final made = data['cartCreate'];
@@ -596,7 +631,12 @@ query Variants(\$ids: [ID!]!) {
     final accepted = cart['lines'] is Map<String, dynamic> ? <String, int>{} : {...sent};
     for (final n in cart['lines'] is Map<String, dynamic> ? (cart['lines']['nodes'] as List?) ?? const [] : const []) {
       if (n case {'quantity': final num q, 'merchandise': {'id': final String id}}) {
-        accepted[id] = (accepted[id] ?? 0) + q.toInt();
+        final attributes = <String, String>{
+          for (final a in (n['attributes'] as List?) ?? const [])
+            if (a case {'key': final String k, 'value': final String v}) k: v,
+        };
+        final key = CartLine.keyOf(id, attributes);
+        accepted[key] = (accepted[key] ?? 0) + q.toInt();
       }
     }
     final short = [for (final e in sent.entries) if ((accepted[e.key] ?? 0) < e.value) e.key];
@@ -648,11 +688,27 @@ class CartLine {
     this.image,
     this.qty = 1,
     this.available = true,
+    this.attributes = const {},
   });
 
   final String variantId;
   final String handle;
   final String title;
+
+  /// What goes on the order with the shirt, such as the jersey number to
+  /// print on it: `{'Jersey number': '23'}`. Shopify calls these the line's
+  /// attributes; Ninja reads them to print.
+  final Map<String, String> attributes;
+
+  /// Tells lines apart: the same shirt with two different numbers is two
+  /// lines. Just the variant's id when there's nothing to print.
+  String get key => keyOf(variantId, attributes);
+
+  static String keyOf(String variantId, Map<String, String> attributes) {
+    if (attributes.isEmpty) return variantId;
+    final keys = attributes.keys.toList()..sort();
+    return [variantId, for (final k in keys) '$k=${attributes[k]}'].join('\u0000');
+  }
 
   /// "Size YM".
   final String detail;
@@ -679,6 +735,7 @@ class CartLine {
         'image': image,
         'qty': qty,
         if (!available) 'available': false,
+        if (attributes.isNotEmpty) 'attributes': attributes,
       };
 
   static CartLine fromJson(Map<String, dynamic> j) => CartLine(
@@ -691,6 +748,10 @@ class CartLine {
         image: j['image'] as String?,
         qty: (j['qty'] as num).toInt(),
         available: (j['available'] as bool?) ?? true,
+        attributes: {
+          for (final e in ((j['attributes'] as Map?) ?? const {}).entries)
+            if (e case MapEntry(key: final String k, value: final String v)) k: v,
+        },
       );
 }
 
@@ -813,7 +874,7 @@ class Shop extends ChangeNotifier {
   String get currency => _lines.isEmpty ? 'USD' : _lines.first.currency;
 
   /// The Shopify cart the last checkout was started with, how many of each
-  /// variant went into it, and when.
+  /// line ([CartLine.key]) went into it, and when.
   ({String id, Map<String, int> qty, DateTime at})? _pending;
   bool get checkoutPending => _pending != null;
 
@@ -826,8 +887,15 @@ class Shop extends ChangeNotifier {
   /// expired, and its shirts stay in this cart.
   static const cartLifetime = Duration(days: 28);
 
-  void add(ShopProduct p, ShopVariant v, [int qty = 1]) {
-    final i = _lines.indexWhere((l) => l.variantId == v.id);
+  /// Puts [qty] of [v] in the cart. [number] is the jersey number to print
+  /// on a shirt that [ShopProduct.takesNumber]; the same shirt with another
+  /// number is a line of its own.
+  void add(ShopProduct p, ShopVariant v, [int qty = 1, String? number]) {
+    final attributes = {
+      if (number != null && number.isNotEmpty) ShopProduct.numberField: number,
+    };
+    final key = CartLine.keyOf(v.id, attributes);
+    final i = _lines.indexWhere((l) => l.key == key);
     if (i >= 0) {
       _lines[i]
         ..qty = (_lines[i].qty + qty).clamp(1, maxQty)
@@ -838,18 +906,20 @@ class Shop extends ChangeNotifier {
         variantId: v.id,
         handle: p.handle,
         title: p.title,
-        detail: p.describe(v),
+        detail: [p.describe(v), if (attributes.isNotEmpty) 'No. $number'].join(' · '),
         price: v.price,
         currency: p.currency,
         image: (v.image ?? p.image)?.url,
         qty: qty.clamp(1, maxQty),
+        attributes: attributes,
       ));
     }
     _changed();
   }
 
-  void setQty(String variantId, int qty) {
-    final i = _lines.indexWhere((l) => l.variantId == variantId);
+  /// Changes the line [key] ([CartLine.key]) to [qty]; 0 takes it out.
+  void setQty(String key, int qty) {
+    final i = _lines.indexWhere((l) => l.key == key);
     if (i < 0) return;
     if (qty <= 0) {
       _lines.removeAt(i);
@@ -859,7 +929,7 @@ class Shop extends ChangeNotifier {
     _changed();
   }
 
-  void remove(String variantId) => setQty(variantId, 0);
+  void remove(String key) => setQty(key, 0);
 
   /// Hands what can be bought to Shopify and returns the page to pay on.
   /// Lines Shopify turns down are marked sold out, and the
@@ -873,8 +943,8 @@ class Shop extends ChangeNotifier {
     } on ShopLinesUnavailable catch (e) {
       // Down to what Shopify has; sold out if it has none.
       for (final l in _lines) {
-        if (!e.variantIds.contains(l.variantId)) continue;
-        final left = e.accepted[l.variantId] ?? 0;
+        if (!e.variantIds.contains(l.key)) continue;
+        final left = e.accepted[l.key] ?? 0;
         if (left > 0) {
           l.qty = left;
         } else {
@@ -939,7 +1009,7 @@ class Shop extends ChangeNotifier {
         return;
       }
       for (final e in pending.qty.entries) {
-        final i = _lines.indexWhere((l) => l.variantId == e.key);
+        final i = _lines.indexWhere((l) => l.key == e.key);
         if (i < 0) continue;
         _lines[i].qty -= e.value;
         if (_lines[i].qty <= 0) _lines.removeAt(i);

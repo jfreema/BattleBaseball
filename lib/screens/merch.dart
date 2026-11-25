@@ -19,6 +19,7 @@ import 'package:battle_baseball/data/shop_html.dart';
 import 'package:battle_baseball/design/bb.dart';
 import 'package:battle_baseball/screens/common.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1751,10 +1752,19 @@ class _ProductScreenState extends State<ProductScreen> {
   int _qty = 1;
   int _photo = 0;
 
+  /// The jersey number to print, on a shirt that takes one.
+  final _number = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _number.dispose();
+    super.dispose();
   }
 
   @override
@@ -1770,6 +1780,7 @@ class _ProductScreenState extends State<ProductScreen> {
       _picked.clear();
       _qty = 1;
       _photo = 0;
+      _number.clear();
     });
     _Load state;
     ShopProduct? p;
@@ -1805,7 +1816,14 @@ class _ProductScreenState extends State<ProductScreen> {
       });
 
   void _add(ShopProduct p, ShopVariant v) {
-    Shop.instance.add(p, v, _qty);
+    final number = _number.text.trim();
+    if (p.takesNumber && number.isEmpty) {
+      toast(context, 'Add your jersey number.');
+      return;
+    }
+    // The number stays filled in: a second shirt is usually for the same
+    // player.
+    Shop.instance.add(p, v, _qty, p.takesNumber ? number : null);
     toast(context, _qty == 1 ? 'Added to your cart.' : '$_qty added to your cart.');
     setState(() => _qty = 1);
   }
@@ -1915,6 +1933,28 @@ class _ProductScreenState extends State<ProductScreen> {
               ],
             ),
           ],
+        ],
+        if (p.takesNumber) ...[
+          const SizedBox(height: 20),
+          Text('JERSEY NUMBER', style: BB.caps(13)),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: 160,
+            child: TextField(
+              controller: _number,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              maxLength: 2,
+              style: BB.lilita(26, color: BB.cream, height: 1.15),
+              decoration: const InputDecoration(
+                hintText: '23',
+                semanticCounterText: '',
+                counterText: '',
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text('1 or 2 digits, printed on the back.', style: BB.labelStyle(14, color: BB.creamSoft)),
         ],
         const SizedBox(height: 24),
         LayoutBuilder(
@@ -2451,7 +2491,7 @@ class _CartRow extends StatelessWidget {
                           value: l.qty,
                           small: true,
                           what: [l.title, if (l.detail.isNotEmpty) l.detail].join(', '),
-                          onChanged: (q) => Shop.instance.setQty(l.variantId, q),
+                          onChanged: (q) => Shop.instance.setQty(l.key, q),
                         ),
                         Padding(
                           padding: const EdgeInsets.only(right: 8),
@@ -2468,7 +2508,7 @@ class _CartRow extends StatelessWidget {
           IconTap(
             BBGlyph.close,
             label: 'Remove ${l.title}${l.detail.isEmpty ? '' : ', ${l.detail}'}',
-            onTap: () => Shop.instance.remove(l.variantId),
+            onTap: () => Shop.instance.remove(l.key),
           ),
         ],
       ),
