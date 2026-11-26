@@ -255,6 +255,7 @@ class _ShopFooter extends StatelessWidget {
       runSpacing: 2,
       children: [
         Text('Shirts are printed to order and shipped to you.', style: BB.bodyStyle(14.5)),
+        Text('We only ship to the continental US.', style: BB.bodyStyle(14.5)),
         Text('Checkout is secure.', style: BB.bodyStyle(14.5)),
       ],
     );
@@ -547,6 +548,54 @@ class _ShopPage extends StatelessWidget {
   }
 }
 
+/// Where the shirts can be shipped. Jared's rule (Nov 25, 2026): the
+/// continental US only, no exceptions. Shopify's checkout enforces it too.
+const shipsTo = 'We only ship to the continental US (the lower 48 states and Washington, DC). No exceptions.';
+
+/// [shipsTo] on paper behind a pin, so nobody misses it: on the shop's
+/// first page, on every shirt's page and in the cart, in Merch and on
+/// Battle Shop alike.
+class ShippingNotice extends StatelessWidget {
+  const ShippingNotice({super.key});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        container: true,
+        label: 'Continental US shipping only. $shipsTo',
+        excludeSemantics: true,
+        child: Paper(
+          padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: BB.coral,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: BB.ink, width: 2),
+                ),
+                child: Center(child: BBIcon(BBGlyph.pin, size: 17, color: BB.ink)),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 2),
+                    Text('CONTINENTAL US SHIPPING ONLY', style: BB.caps(13, color: BB.ink)),
+                    const SizedBox(height: 6),
+                    Text(shipsTo, style: BB.bodyStyle(15, color: BB.ink, height: 1.35)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
 /// "Cart · 2": the way to the cart from anywhere in the shop.
 class CartButton extends StatelessWidget {
   const CartButton({super.key, this.compact = false, this.band = false, this.small = true});
@@ -609,6 +658,11 @@ class _MerchScreenState extends State<MerchScreen> {
                 lead: standalone ? _ShopFront([for (final s in shop.sections) ...s.products]) : null,
                 children: [
                   if (!standalone) title,
+                  // Where the shirts can go, before any of them.
+                  Padding(
+                    padding: EdgeInsets.only(top: standalone ? (wide ? 40 : 28) : 4, bottom: wide ? 40 : 28),
+                    child: const ShippingNotice(),
+                  ),
                   ..._sections(shop.sections, wide: wide, standalone: standalone),
                   // Battle Shop's footer says so on every page.
                   if (!standalone) ...[
@@ -1972,6 +2026,8 @@ class _ProductScreenState extends State<ProductScreen> {
             return Row(children: [qty, const SizedBox(width: 12), Expanded(child: button)]);
           },
         ),
+        const SizedBox(height: 18),
+        const ShippingNotice(),
         if (standalone) ...[
           const SizedBox(height: 22),
           const _Promises(),
@@ -2407,6 +2463,8 @@ class _CartScreenState extends State<CartScreen> {
                   ].join(' '),
                   style: BB.bodyStyle(15),
                 ),
+                const SizedBox(height: 16),
+                const ShippingNotice(),
                 const SizedBox(height: 20),
                 BBButton.primary(
                   'Check out',
