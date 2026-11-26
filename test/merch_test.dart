@@ -1027,6 +1027,30 @@ void main() {
     }
   });
 
+  testWidgets('the shop, every shirt and the cart say we only ship to the continental US, in Merch and on Battle Shop',
+      (t) async {
+    for (final size in [_phone, _desktop]) {
+      for (final standalone in [false, true]) {
+        final root = standalone ? '' : '/merch';
+        for (final location in [standalone ? '/' : root, '$root/$_tropic', '$root/cart']) {
+          Shop.instance = Shop(SampleShop());
+          await _fillCart();
+          if (standalone) {
+            await _openShop(t, location, size: size);
+          } else {
+            await _open(t, location, size: size);
+          }
+          final at = '$location${standalone ? ' on Battle Shop' : ''} at ${size.width.round()} wide';
+          expect(t.takeException(), isNull, reason: at);
+          expect(find.byType(ShippingNotice), findsOneWidget, reason: at);
+          expect(find.text(shipsTo), findsOneWidget, reason: at);
+          expect(find.text('CONTINENTAL US SHIPPING ONLY'), findsOneWidget, reason: at);
+          await _close(t);
+        }
+      }
+    }
+  });
+
   testWidgets('in the app itself /shop is Merch, inside the app', (t) async {
     Session.demoAs = 'family'; // signed in as Jamie, with nothing read from Firebase
     t.view
