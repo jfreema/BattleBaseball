@@ -118,7 +118,8 @@ for (const e of events) {
     name: e.name,
     status: 'final',
     city: 'Baton Rouge, LA',
-    venue: 'BREC Central Sports Park',
+    // A made-up park: these showcases never happened, so don't name a real one.
+    venue: 'Cypress Hollow Ballpark',
     address: 'Baton Rouge, LA',
     start: Timestamp.fromDate(e.start),
     ageGroups: '10U, 12U and 14U',
