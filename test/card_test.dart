@@ -137,7 +137,7 @@ void main() {
           id: status,
           name: 'Spring Showcase',
           status: status,
-          venue: 'BREC Central Sports Park',
+          venue: 'Cypress Hollow Ballpark',
           start: DateTime(2027, 3, 13, 9),
           ageGroups: '9U to 14U',
           price: 85,
